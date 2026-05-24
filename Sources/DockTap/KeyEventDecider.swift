@@ -4,12 +4,17 @@ enum KeyEventKind {
 }
 
 struct KeyEventDecision: Equatable {
-    let match: RuleMatch?
-    let result: ProbeEventResult
+    let intent: ShortcutIntent?
+    let result: ShortcutDecisionResult
 
     var consumesEvent: Bool {
         result == .consumed
     }
+}
+
+enum ShortcutDecisionResult: String, Equatable {
+    case consumed
+    case passThrough = "pass-through"
 }
 
 struct KeyEventDecider {
@@ -19,21 +24,21 @@ struct KeyEventDecider {
         kind: KeyEventKind,
         keyCode: UInt16,
         modifiers: ModifierSnapshot,
-        frontmostBundleID: String?
+        slots: DockSlotSnapshot
     ) -> KeyEventDecision {
         guard kind == .keyDown else {
-            return KeyEventDecision(match: nil, result: .passThrough)
+            return KeyEventDecision(intent: nil, result: .passThrough)
         }
 
-        let match = matcher.matchKeyDown(
+        let intent = matcher.matchKeyDown(
             keyCode: keyCode,
             modifiers: modifiers,
-            frontmostBundleID: frontmostBundleID
+            slots: slots
         )
 
         return KeyEventDecision(
-            match: match,
-            result: match == nil ? .passThrough : .consumed
+            intent: intent,
+            result: intent == nil ? .passThrough : .consumed
         )
     }
 }

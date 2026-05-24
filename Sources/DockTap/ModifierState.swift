@@ -18,22 +18,6 @@ struct ModifierSnapshot: Equatable {
             leftCommand || rightCommand ||
             leftControl || rightControl
     }
-
-    var shortDescription: String {
-        [
-            "LOpt:\(bit(leftOption))",
-            "ROpt:\(bit(rightOption))",
-            "Shift:\(bit(leftShift || rightShift))",
-            "Cmd:\(bit(leftCommand || rightCommand))",
-            "Ctrl:\(bit(leftControl || rightControl))",
-            "Caps:\(bit(capsLock))",
-            "Fn:\(bit(function))"
-        ].joined(separator: " ")
-    }
-
-    private func bit(_ value: Bool) -> String {
-        value ? "1" : "0"
-    }
 }
 
 struct ModifierChange: Equatable {

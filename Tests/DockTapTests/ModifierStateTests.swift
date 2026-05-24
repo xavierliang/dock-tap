@@ -1,5 +1,5 @@
 import XCTest
-@testable import DockTapProbe
+@testable import DockTap
 
 final class ModifierStateTests: XCTestCase {
     func testTracksLeftAndRightOptionIndependently() {

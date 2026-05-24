@@ -3,22 +3,23 @@
 import PackageDescription
 
 let package = Package(
-    name: "DockTapProbe",
+    name: "DockTap",
     platforms: [
         .macOS(.v13)
     ],
     products: [
-        .executable(name: "DockTapProbe", targets: ["DockTapProbe"])
+        .executable(name: "DockTap", targets: ["DockTap"])
     ],
     targets: [
         .executableTarget(
-            name: "DockTapProbe",
-            path: "Sources/DockTapProbe"
+            name: "DockTap",
+            path: "Sources/DockTap"
         ),
         .testTarget(
-            name: "DockTapProbeTests",
-            dependencies: ["DockTapProbe"],
-            path: "Tests/DockTapProbeTests"
+            name: "DockTapTests",
+            dependencies: ["DockTap"],
+            path: "Tests/DockTapTests",
+            resources: [.copy("Fixtures")]
         )
     ]
 )

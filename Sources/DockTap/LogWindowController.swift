@@ -34,7 +34,7 @@ final class LogWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        window.title = "Dock Tap Probe Logs"
+        window.title = "Dock Tap Logs"
         window.contentView = scrollView
         window.center()
 

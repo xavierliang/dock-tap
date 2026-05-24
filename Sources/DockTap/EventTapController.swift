@@ -3,25 +3,27 @@ import Foundation
 
 final class EventTapController {
     private let logStore: LogStore
+    private let onShortcut: (ShortcutIntent) -> Void
     private let decider = KeyEventDecider()
-    private let frontmostLock = NSLock()
+    private let slotLock = NSLock()
     private let tapLock = NSLock()
 
-    private var cachedFrontmostBundleID: String?
+    private var slotSnapshot = DockSlotSnapshot.empty
     private var modifierState = ModifierState()
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var tapRunLoop: CFRunLoop?
     private var tapThread: Thread?
 
-    init(logStore: LogStore) {
+    init(logStore: LogStore, onShortcut: @escaping (ShortcutIntent) -> Void) {
         self.logStore = logStore
+        self.onShortcut = onShortcut
     }
 
-    func updateFrontmostBundleID(_ bundleID: String?) {
-        frontmostLock.lock()
-        cachedFrontmostBundleID = bundleID
-        frontmostLock.unlock()
+    func updateSlotSnapshot(_ snapshot: DockSlotSnapshot) {
+        slotLock.lock()
+        slotSnapshot = snapshot
+        slotLock.unlock()
     }
 
     func install() -> Bool {
@@ -38,7 +40,7 @@ final class EventTapController {
             }
             self.runTapThread(installResult: installResult)
         }
-        thread.name = "DockTapProbe Event Tap"
+        thread.name = "DockTap Event Tap"
 
         tapLock.lock()
         tapThread = thread
@@ -88,37 +90,25 @@ final class EventTapController {
             return Unmanaged.passUnretained(event)
         }
 
-        let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
-        let currentFrontmostBundleID = currentFrontmostSnapshot()
-
         switch type {
         case .flagsChanged:
+            let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
             let isDown = Self.isKeyDown(keyCode)
             modifierState.setPhysicalKey(keyCode, isDown: isDown)
-            enqueueRecord(
-                type: "flagsChanged",
-                keyCode: keyCode,
-                frontmostBundleID: currentFrontmostBundleID,
-                match: nil,
-                result: .stateOnly
-            )
             return Unmanaged.passUnretained(event)
 
         case .keyDown, .keyUp:
+            let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
             modifierState.resync(readKeyDown: Self.isKeyDown)
             let decision = decider.decide(
                 kind: type == .keyDown ? .keyDown : .keyUp,
                 keyCode: keyCode,
                 modifiers: modifierState.snapshot,
-                frontmostBundleID: currentFrontmostBundleID
+                slots: currentSlotSnapshot()
             )
-            enqueueRecord(
-                type: Self.name(for: type),
-                keyCode: keyCode,
-                frontmostBundleID: currentFrontmostBundleID,
-                match: decision.match,
-                result: decision.result
-            )
+            if let intent = decision.intent {
+                enqueueShortcut(intent)
+            }
             return decision.consumesEvent ? nil : Unmanaged.passUnretained(event)
 
         default:
@@ -126,32 +116,16 @@ final class EventTapController {
         }
     }
 
-    private func enqueueRecord(
-        type: String,
-        keyCode: UInt16?,
-        frontmostBundleID: String?,
-        match: RuleMatch?,
-        result: ProbeEventResult
-    ) {
-        let record = ProbeEventRecord(
-            timestamp: Date.timeIntervalSinceReferenceDate,
-            eventType: type,
-            keyCode: keyCode,
-            modifiers: modifierState.snapshot,
-            frontmostBundleID: frontmostBundleID,
-            matchedRuleID: match?.id,
-            result: result
-        )
-
-        DispatchQueue.main.async { [logStore] in
-            logStore.append(record)
+    private func enqueueShortcut(_ intent: ShortcutIntent) {
+        DispatchQueue.main.async { [onShortcut] in
+            onShortcut(intent)
         }
     }
 
-    private func currentFrontmostSnapshot() -> String? {
-        frontmostLock.lock()
-        defer { frontmostLock.unlock() }
-        return cachedFrontmostBundleID
+    private func currentSlotSnapshot() -> DockSlotSnapshot {
+        slotLock.lock()
+        defer { slotLock.unlock() }
+        return slotSnapshot
     }
 
     private func runTapThread(installResult: TapInstallResult) {
