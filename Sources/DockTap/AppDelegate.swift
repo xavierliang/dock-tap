@@ -108,13 +108,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func buildStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.title = "DT"
+        configureStatusItemButton(item.button)
 
         statusMenu.delegate = self
         item.menu = statusMenu
 
         statusItem = item
         rebuildMenu()
+    }
+
+    private func configureStatusItemButton(_ button: NSStatusBarButton?) {
+        guard let button else {
+            return
+        }
+
+        guard let image = Bundle.main.image(forResource: "StatusBarIconTemplate") else {
+            button.image = nil
+            button.imagePosition = .noImage
+            button.title = "DT"
+            return
+        }
+
+        image.isTemplate = true
+        button.image = image
+        button.imagePosition = .imageOnly
+        button.title = ""
     }
 
     private func checkPermission(prompt: Bool) {

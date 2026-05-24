@@ -20,6 +20,9 @@ mkdir -p "$MACOS" "$RESOURCES"
 
 cp "$BIN_DIR/DockTap" "$MACOS/DockTap"
 cp "$ROOT/Resources/Info.plist" "$CONTENTS/Info.plist"
+for resource in DockTap.icns StatusBarIconTemplate.png StatusBarIconTemplate@2x.png; do
+    cp "$ROOT/Resources/$resource" "$RESOURCES/$resource"
+done
 chmod +x "$MACOS/DockTap"
 
 /usr/bin/plutil -lint "$CONTENTS/Info.plist" >/dev/null

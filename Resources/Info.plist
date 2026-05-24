@@ -8,6 +8,8 @@
     <string>Dock Tap</string>
     <key>CFBundleExecutable</key>
     <string>DockTap</string>
+    <key>CFBundleIconFile</key>
+    <string>DockTap</string>
     <key>CFBundleIdentifier</key>
     <string>ai.resopod.docktap</string>
     <key>CFBundleInfoDictionaryVersion</key>
