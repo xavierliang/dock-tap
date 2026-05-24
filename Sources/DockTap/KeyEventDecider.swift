@@ -25,7 +25,8 @@ struct KeyEventDecider {
         keyCode: UInt16,
         modifiers: ModifierSnapshot,
         triggerModifier: TriggerModifierPreset,
-        slots: DockSlotSnapshot
+        slots: DockSlotSnapshot,
+        windowActionsEnabled: Bool
     ) -> KeyEventDecision {
         guard kind == .keyDown else {
             return KeyEventDecision(intent: nil, result: .passThrough)
@@ -35,7 +36,8 @@ struct KeyEventDecider {
             keyCode: keyCode,
             modifiers: modifiers,
             triggerModifier: triggerModifier,
-            slots: slots
+            slots: slots,
+            windowActionsEnabled: windowActionsEnabled
         )
 
         return KeyEventDecision(

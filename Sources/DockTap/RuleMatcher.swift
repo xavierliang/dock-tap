@@ -14,11 +14,21 @@ struct RuleMatcher {
         KeyCodes.zero: 9
     ]
 
+    private let windowActionsByKeyCode: [UInt16: WindowAction] = [
+        KeyCodes.leftArrow: .leftHalf,
+        KeyCodes.rightArrow: .rightHalf,
+        KeyCodes.upArrow: .topHalf,
+        KeyCodes.downArrow: .bottomHalf,
+        KeyCodes.returnKey: .maximize,
+        KeyCodes.space: .center
+    ]
+
     func matchKeyDown(
         keyCode: UInt16,
         modifiers: ModifierSnapshot,
         triggerModifier: TriggerModifierPreset,
-        slots: DockSlotSnapshot
+        slots: DockSlotSnapshot,
+        windowActionsEnabled: Bool
     ) -> ShortcutIntent? {
         guard triggerModifier.matches(modifiers) else {
             return nil
@@ -36,6 +46,13 @@ struct RuleMatcher {
 
         if keyCode == KeyCodes.backtick {
             return .finder(shortcutLabel: triggerModifier.shortcutLabel(forKeyLabel: "`"))
+        }
+
+        if windowActionsEnabled, let action = windowActionsByKeyCode[keyCode] {
+            return .windowAction(
+                action,
+                shortcutLabel: triggerModifier.shortcutLabel(forKeyLabel: action.shortcutKeyLabel)
+            )
         }
 
         return nil

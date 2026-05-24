@@ -12,6 +12,12 @@ enum KeyCodes {
     static let nine: UInt16 = 25
     static let zero: UInt16 = 29
     static let backtick: UInt16 = 50
+    static let returnKey: UInt16 = 36
+    static let space: UInt16 = 49
+    static let leftArrow: UInt16 = 123
+    static let rightArrow: UInt16 = 124
+    static let downArrow: UInt16 = 125
+    static let upArrow: UInt16 = 126
 
     static let leftCommand: UInt16 = 55
     static let rightCommand: UInt16 = 54
@@ -50,6 +56,12 @@ enum KeyCodes {
         case nine: "9"
         case zero: "0"
         case backtick: "`"
+        case returnKey: "Return"
+        case space: "Space"
+        case leftArrow: "leftArrow"
+        case rightArrow: "rightArrow"
+        case downArrow: "downArrow"
+        case upArrow: "upArrow"
         case leftOption: "leftOption"
         case rightOption: "rightOption"
         case leftShift: "leftShift"

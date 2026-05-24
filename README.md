@@ -36,6 +36,27 @@ The trigger modifier is fixed to one of five physical presets:
 
 Only the selected physical key may be down. The opposite side or another Option, Command, or Control key rejects the shortcut; any Shift key also rejects it. Caps Lock and Fn do not reject shortcuts.
 
+## Window Snap
+
+Window Snap is off by default. Enable `Window Snap` from the menu to let the same trigger preset resize the focused window:
+
+| Shortcut | Action |
+| --- | --- |
+| `<preset>+←` | Left Half |
+| `<preset>+→` | Right Half |
+| `<preset>+↑` | Top Half |
+| `<preset>+↓` | Bottom Half |
+| `<preset>+Return` | Maximize |
+| `<preset>+Space` | Center at 75% width and 75% height |
+
+The `Show Window Snap Bindings` submenu shows the exact bindings for the current trigger preset. Window Snap uses the focused window on its current display and does not cycle sizes or move windows between displays.
+
+When enabled, Window Snap uses the existing Accessibility trust to write other apps' window position and size, broadening Dock Tap's trust surface beyond app activation.
+
+When Window Snap is enabled, Dock Tap consumes those chords before the focused app or macOS global shortcut handlers see them. This affects editor and text-field shortcuts such as `Option+←` / `Option+→` word jumps or `Command+←` / `Command+→` line/document jumps when that same preset is selected. It also affects system shortcuts such as `Command+Space` for Spotlight if your trigger preset is Command, and `Control+Space` for input-source switching if your trigger preset is Control.
+
+Use the menu toggle as the quick escape hatch, or choose a trigger preset that does not overlap the shortcuts you rely on. If you want cycling, thirds, sixths, layouts, drag snapping, or cross-display window movement, Rectangle is the better tool for that full window-management suite.
+
 ## Launch at Login
 
 Dock Tap uses `SMAppService.mainApp`; there is no helper target. macOS registers the currently running packaged app path. For daily use, keep that path stable before enabling Launch at Login. To use `/Applications`, first copy the built app to `/Applications/DockTap.app`, launch `/Applications/DockTap.app`, then enable Launch at Login from that running copy. Do not enable Launch at Login from `build/DockTap.app` and move the app afterward.

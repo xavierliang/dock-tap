@@ -3,6 +3,7 @@ import Foundation
 final class SettingsStore {
     private enum Keys {
         static let triggerModifierPreset = "triggerModifierPreset"
+        static let windowActionsEnabled = "windowActionsEnabled"
     }
 
     private let defaults: UserDefaults
@@ -20,6 +21,15 @@ final class SettingsStore {
         }
         set {
             defaults.set(newValue.rawValue, forKey: Keys.triggerModifierPreset)
+        }
+    }
+
+    var windowActionsEnabled: Bool {
+        get {
+            defaults.bool(forKey: Keys.windowActionsEnabled)
+        }
+        set {
+            defaults.set(newValue, forKey: Keys.windowActionsEnabled)
         }
     }
 }

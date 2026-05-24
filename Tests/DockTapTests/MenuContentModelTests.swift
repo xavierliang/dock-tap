@@ -7,7 +7,8 @@ final class MenuContentModelTests: XCTestCase {
             dockRows: (0..<10).map { row(index: $0, name: "Dock App \($0 + 1)") },
             selectedPreset: .leftOption,
             isAccessibilityTrusted: true,
-            isEventTapReady: true
+            isEventTapReady: true,
+            windowActionsEnabled: false
         )
 
         XCTAssertEqual(
@@ -27,7 +28,8 @@ final class MenuContentModelTests: XCTestCase {
             ],
             selectedPreset: .rightCommand,
             isAccessibilityTrusted: true,
-            isEventTapReady: true
+            isEventTapReady: true,
+            windowActionsEnabled: false
         )
 
         XCTAssertEqual(model.mappingRows.count, 10)
@@ -43,7 +45,8 @@ final class MenuContentModelTests: XCTestCase {
             dockRows: [],
             selectedPreset: .rightOption,
             isAccessibilityTrusted: true,
-            isEventTapReady: true
+            isEventTapReady: true,
+            windowActionsEnabled: false
         )
 
         XCTAssertEqual(model.triggerModifierTitle, "Trigger Modifier: Right Option")
@@ -56,7 +59,8 @@ final class MenuContentModelTests: XCTestCase {
             dockRows: [],
             selectedPreset: .leftOption,
             isAccessibilityTrusted: true,
-            isEventTapReady: true
+            isEventTapReady: true,
+            windowActionsEnabled: false
         )
 
         XCTAssertEqual(model.updateDockShortcutsTitle, "Update Dock Shortcuts")
@@ -67,7 +71,8 @@ final class MenuContentModelTests: XCTestCase {
             dockRows: (0..<12).map { row(index: $0, name: "Dock App \($0 + 1)") },
             selectedPreset: .leftControl,
             isAccessibilityTrusted: true,
-            isEventTapReady: true
+            isEventTapReady: true,
+            windowActionsEnabled: false
         )
 
         XCTAssertEqual(model.assignedShortcutCount, 10)
@@ -81,13 +86,15 @@ final class MenuContentModelTests: XCTestCase {
             dockRows: [],
             selectedPreset: .leftOption,
             isAccessibilityTrusted: false,
-            isEventTapReady: false
+            isEventTapReady: false,
+            windowActionsEnabled: false
         )
         let trusted = MenuContentModel(
             dockRows: [],
             selectedPreset: .leftOption,
             isAccessibilityTrusted: true,
-            isEventTapReady: true
+            isEventTapReady: true,
+            windowActionsEnabled: false
         )
 
         XCTAssertEqual(missing.summaryTitle, "Missing Accessibility Permission | Left Option | 0 Dock shortcuts")
@@ -102,11 +109,38 @@ final class MenuContentModelTests: XCTestCase {
             dockRows: [],
             selectedPreset: .leftCommand,
             isAccessibilityTrusted: true,
-            isEventTapReady: false
+            isEventTapReady: false,
+            windowActionsEnabled: false
         )
 
         XCTAssertEqual(model.summaryTitle, "Ready | Left Command | 0 Dock shortcuts")
         XCTAssertFalse(model.summaryTitle.contains("Starting"))
+    }
+
+    func testWindowSnapToggleAndRowsUseSelectedPreset() {
+        let model = MenuContentModel(
+            dockRows: [],
+            selectedPreset: .leftOption,
+            isAccessibilityTrusted: true,
+            isEventTapReady: true,
+            windowActionsEnabled: true
+        )
+
+        XCTAssertEqual(model.windowSnapToggleTitle, "Window Snap")
+        XCTAssertTrue(model.windowSnapToggleIsOn)
+        XCTAssertEqual(model.windowSnapSubmenuTitle, "Show Window Snap Bindings")
+        XCTAssertEqual(model.windowSnapRows.map(\.action), WindowAction.allCases)
+        XCTAssertEqual(
+            model.windowSnapRows.map(\.title),
+            [
+                "Left Option+←  Left Half",
+                "Left Option+→  Right Half",
+                "Left Option+↑  Top Half",
+                "Left Option+↓  Bottom Half",
+                "Left Option+Return  Maximize",
+                "Left Option+Space  Center"
+            ]
+        )
     }
 
     private func row(

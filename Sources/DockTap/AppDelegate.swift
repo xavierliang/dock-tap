@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let activeAppProvider = ActiveAppProvider()
     private let dockSlotStore = DockSlotStore()
     private lazy var appActivator = AppActivator(logStore: logStore)
+    private lazy var windowActor = WindowActor(logStore: logStore)
 
     private var statusItem: NSStatusItem?
     private let statusMenu = NSMenu()
@@ -17,11 +18,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var didInstallTap = false
     private var isAccessibilityTrusted = false
     private var selectedTriggerModifierPreset = TriggerModifierPreset.defaultPreset
+    private var windowActionsEnabled = false
     private var lastLoginItemFailure: String?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         selectedTriggerModifierPreset = settingsStore.selectedTriggerModifierPreset
+        windowActionsEnabled = settingsStore.windowActionsEnabled
         buildStatusItem()
 
         logWindowController = LogWindowController(logStore: logStore)
@@ -29,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.handleShortcut(intent)
         }
         eventTapController?.updateTriggerModifierPreset(selectedTriggerModifierPreset)
+        eventTapController?.updateWindowActionsEnabled(windowActionsEnabled)
 
         logStore.append("launch bundle=\(bundleIdentifier) path=\(Bundle.main.bundlePath) trigger=\(selectedTriggerModifierPreset.rawValue)")
         activeAppProvider.start { [weak self] state in
@@ -77,6 +81,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settingsStore.selectedTriggerModifierPreset = preset
         eventTapController?.updateTriggerModifierPreset(preset)
         logStore.append("trigger modifier preset=\(preset.rawValue)")
+        rebuildMenu()
+    }
+
+    @objc private func toggleWindowActionsEnabled() {
+        windowActionsEnabled.toggle()
+        settingsStore.windowActionsEnabled = windowActionsEnabled
+        eventTapController?.updateWindowActionsEnabled(windowActionsEnabled)
+        logStore.append("window snap enabled=\(windowActionsEnabled)")
         rebuildMenu()
     }
 
@@ -192,7 +204,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func handleShortcut(_ intent: ShortcutIntent) {
-        appActivator.perform(intent)
+        switch intent {
+        case .windowAction:
+            windowActor.perform(intent)
+        case .dockSlot, .finder:
+            appActivator.perform(intent)
+        }
     }
 
     private func rebuildMenu() {
@@ -204,7 +221,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             dockRows: dockSlotStore.menuRows(),
             selectedPreset: selectedTriggerModifierPreset,
             isAccessibilityTrusted: isAccessibilityTrusted,
-            isEventTapReady: didInstallTap
+            isEventTapReady: didInstallTap,
+            windowActionsEnabled: windowActionsEnabled
         )
 
         statusMenu.addItem(disabledItem(menuModel.summaryTitle))
@@ -218,6 +236,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusMenu.addItem(mappingMenuItem(menuModel))
         statusMenu.addItem(triggerModifierMenuItem(menuModel))
         statusMenu.addItem(.separator())
+
+        let windowSnapItem = commandItem(
+            title: menuModel.windowSnapToggleTitle,
+            action: #selector(toggleWindowActionsEnabled),
+            keyEquivalent: ""
+        )
+        windowSnapItem.state = menuModel.windowSnapToggleIsOn ? .on : .off
+        statusMenu.addItem(windowSnapItem)
+        statusMenu.addItem(windowSnapMenuItem(menuModel))
 
         let loginItem = commandItem(title: loginMenuModel.title, action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
         loginItem.state = loginMenuModel.isChecked ? .on : .off
@@ -242,6 +269,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let item = NSMenuItem(title: menuModel.showDockMappingTitle, action: nil, keyEquivalent: "")
         let submenu = NSMenu(title: menuModel.showDockMappingTitle)
         for row in menuModel.mappingRows {
+            submenu.addItem(disabledItem(row.title))
+        }
+        item.submenu = submenu
+        return item
+    }
+
+    private func windowSnapMenuItem(_ menuModel: MenuContentModel) -> NSMenuItem {
+        let item = NSMenuItem(title: menuModel.windowSnapSubmenuTitle, action: nil, keyEquivalent: "")
+        let submenu = NSMenu(title: menuModel.windowSnapSubmenuTitle)
+        for row in menuModel.windowSnapRows {
             submenu.addItem(disabledItem(row.title))
         }
         item.submenu = submenu

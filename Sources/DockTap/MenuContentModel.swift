@@ -15,12 +15,21 @@ struct MenuContentModel: Equatable {
         let isSelected: Bool
     }
 
+    struct WindowSnapRow: Equatable {
+        let action: WindowAction
+        let title: String
+    }
+
     let summaryTitle: String
     let exampleRows: [ExampleRow]
     let showDockMappingTitle: String
     let mappingRows: [MappingRow]
     let triggerModifierTitle: String
     let triggerRows: [TriggerRow]
+    let windowSnapToggleTitle: String
+    let windowSnapToggleIsOn: Bool
+    let windowSnapSubmenuTitle: String
+    let windowSnapRows: [WindowSnapRow]
     let updateDockShortcutsTitle: String
     let showLogsTitle: String
     let checkAccessibilityTitle: String?
@@ -32,7 +41,8 @@ struct MenuContentModel: Equatable {
         dockRows: [DockSlotMenuRow],
         selectedPreset: TriggerModifierPreset,
         isAccessibilityTrusted: Bool,
-        isEventTapReady: Bool
+        isEventTapReady: Bool,
+        windowActionsEnabled: Bool
     ) {
         let rowsByIndex = Dictionary(uniqueKeysWithValues: dockRows.map { ($0.target.shortcutIndex, $0) })
         let assignedCount = min(10, Set(rowsByIndex.keys.filter { (0..<10).contains($0) }).count)
@@ -61,6 +71,10 @@ struct MenuContentModel: Equatable {
                 isSelected: preset == selectedPreset
             )
         }
+        windowSnapToggleTitle = AppText.WindowSnap.toggleTitle
+        windowSnapToggleIsOn = windowActionsEnabled
+        windowSnapSubmenuTitle = AppText.WindowSnap.submenuTitle
+        windowSnapRows = Self.windowSnapRows(selectedPreset: selectedPreset)
         updateDockShortcutsTitle = AppText.Menu.updateDockShortcuts
         showLogsTitle = AppText.Menu.showLogs
         checkAccessibilityTitle = isAccessibilityTrusted ? nil : AppText.Menu.checkAccessibility
@@ -100,5 +114,14 @@ struct MenuContentModel: Equatable {
             title: "\(label)  \(row.target.displayName) [\(row.status.rawValue)]",
             isAssigned: true
         )
+    }
+
+    private static func windowSnapRows(selectedPreset: TriggerModifierPreset) -> [WindowSnapRow] {
+        WindowAction.allCases.map { action in
+            WindowSnapRow(
+                action: action,
+                title: "\(selectedPreset.shortcutLabel(forKeyLabel: action.shortcutKeyLabel))  \(action.displayName)"
+            )
+        }
     }
 }

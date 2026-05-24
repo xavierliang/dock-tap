@@ -27,6 +27,17 @@ enum AppText {
         }
     }
 
+    enum WindowSnap {
+        static let toggleTitle = "Window Snap"
+        static let submenuTitle = "Show Window Snap Bindings"
+        static let leftHalf = "Left Half"
+        static let rightHalf = "Right Half"
+        static let topHalf = "Top Half"
+        static let bottomHalf = "Bottom Half"
+        static let maximize = "Maximize"
+        static let center = "Center"
+    }
+
     enum LoginItem {
         static let launchAtLogin = "Launch at Login"
         static let requiresApproval = "Launch at Login (Requires Approval)"

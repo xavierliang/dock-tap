@@ -13,6 +13,7 @@ enum AppActivationRoute: Equatable {
     case activateFinder(shortcutLabel: String)
     case launchFinder(URL, shortcutLabel: String)
     case finderUnavailable(shortcutLabel: String)
+    case ignoredNonActivationIntent(shortcutLabel: String)
 }
 
 final class AppActivator {
@@ -51,6 +52,8 @@ final class AppActivator {
                 return .launchFinder(finderURL, shortcutLabel: shortcutLabel)
             }
             return .finderUnavailable(shortcutLabel: shortcutLabel)
+        case .windowAction(_, shortcutLabel: let shortcutLabel):
+            return .ignoredNonActivationIntent(shortcutLabel: shortcutLabel)
         }
     }
 
@@ -70,6 +73,8 @@ final class AppActivator {
         case .finderUnavailable(let shortcutLabel):
             logStore.append("action start Finder shortcut=\(shortcutLabel)")
             logStore.append("action failed Finder app URL unavailable")
+        case .ignoredNonActivationIntent(let shortcutLabel):
+            logStore.append("action skipped non-activation intent shortcut=\(shortcutLabel)")
         }
     }
 

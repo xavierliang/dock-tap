@@ -41,7 +41,8 @@ final class AppActivatorTests: XCTestCase {
             keyCode: KeyCodes.one,
             modifiers: modifiers,
             triggerModifier: .leftOption,
-            slots: snapshot
+            slots: snapshot,
+            windowActionsEnabled: false
         )
 
         guard let intent = decision.intent else {
@@ -49,6 +50,19 @@ final class AppActivatorTests: XCTestCase {
             return .finder(shortcutLabel: "Left Option+`")
         }
         return intent
+    }
+
+    func testRouteIgnoresWindowActionDefensively() {
+        let route = AppActivator.route(
+            for: .windowAction(.leftHalf, shortcutLabel: "Left Option+←"),
+            context: AppActivationContext(
+                runningBundleIdentifiers: [],
+                finderIsRunning: false,
+                finderURL: nil
+            )
+        )
+
+        XCTAssertEqual(route, .ignoredNonActivationIntent(shortcutLabel: "Left Option+←"))
     }
 
     private func appEntry(name: String, dockOrdinal: Int, bundleIdentifier: String?) -> DockAppEntry {

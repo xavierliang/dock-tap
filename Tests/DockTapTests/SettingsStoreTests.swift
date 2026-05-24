@@ -39,4 +39,28 @@ final class SettingsStoreTests: XCTestCase {
 
         XCTAssertEqual(store.selectedTriggerModifierPreset, .leftOption)
     }
+
+    func testWindowActionsDefaultToDisabled() {
+        let store = SettingsStore(defaults: defaults)
+
+        XCTAssertFalse(store.windowActionsEnabled)
+    }
+
+    func testPersistsWindowActionsEnabled() {
+        let store = SettingsStore(defaults: defaults)
+
+        store.windowActionsEnabled = true
+        XCTAssertTrue(SettingsStore(defaults: defaults).windowActionsEnabled)
+
+        store.windowActionsEnabled = false
+        XCTAssertFalse(SettingsStore(defaults: defaults).windowActionsEnabled)
+    }
+
+    func testWindowActionsEnabledLastWriteWins() {
+        let store = SettingsStore(defaults: defaults)
+
+        store.windowActionsEnabled = true
+        store.windowActionsEnabled = false
+        XCTAssertFalse(SettingsStore(defaults: defaults).windowActionsEnabled)
+    }
 }

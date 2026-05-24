@@ -153,7 +153,8 @@ final class RuleMatcherPresetTests: XCTestCase {
             keyCode: KeyCodes.one,
             modifiers: ModifierSnapshot(),
             triggerModifier: .leftOption,
-            slots: snapshot(appCount: 1)
+            slots: snapshot(appCount: 1),
+            windowActionsEnabled: false
         )
 
         XCTAssertFalse(decision.consumesEvent)
@@ -166,7 +167,8 @@ final class RuleMatcherPresetTests: XCTestCase {
             keyCode: KeyCodes.one,
             modifiers: modifiers(with: [KeyCodes.leftOption]),
             triggerModifier: .leftOption,
-            slots: snapshot(appCount: 1)
+            slots: snapshot(appCount: 1),
+            windowActionsEnabled: false
         )
 
         XCTAssertFalse(decision.consumesEvent)
@@ -210,7 +212,8 @@ final class RuleMatcherPresetTests: XCTestCase {
             keyCode: keyCode,
             modifiers: modifiers ?? self.modifiers(with: [preset.physicalKeyCode]),
             triggerModifier: preset,
-            slots: slots
+            slots: slots,
+            windowActionsEnabled: false
         )
     }
 

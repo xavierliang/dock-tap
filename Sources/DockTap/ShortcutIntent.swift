@@ -3,12 +3,15 @@ import Foundation
 enum ShortcutIntent: Equatable {
     case dockSlot(DockSlotTarget, shortcutLabel: String)
     case finder(shortcutLabel: String)
+    case windowAction(WindowAction, shortcutLabel: String)
 
     var label: String {
         switch self {
         case .dockSlot(_, let shortcutLabel):
             shortcutLabel
         case .finder(let shortcutLabel):
+            shortcutLabel
+        case .windowAction(_, let shortcutLabel):
             shortcutLabel
         }
     }
