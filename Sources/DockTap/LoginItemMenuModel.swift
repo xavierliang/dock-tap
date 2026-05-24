@@ -8,11 +8,11 @@ struct LoginItemMenuModel: Equatable {
         isChecked = status.isEnabled
 
         var hints: [String] = []
-        if let failureMessage {
-            hints.append("Login item: \(failureMessage)")
+        if failureMessage != nil {
+            hints.append(AppText.LoginItem.failureHint)
         }
         if status == .requiresApproval {
-            hints.append("Approve in System Settings > General > Login Items")
+            hints.append(AppText.LoginItem.approveHint)
         }
         hintRows = hints
     }
@@ -20,13 +20,13 @@ struct LoginItemMenuModel: Equatable {
     private static func title(for status: LoginItemStatus) -> String {
         switch status {
         case .enabled, .disabled:
-            "Launch at Login"
+            AppText.LoginItem.launchAtLogin
         case .requiresApproval:
-            "Launch at Login (Requires Approval)"
+            AppText.LoginItem.requiresApproval
         case .notFound:
-            "Launch at Login (Not Found)"
+            AppText.LoginItem.notFound
         case .error:
-            "Launch at Login (Status Error)"
+            AppText.LoginItem.statusError
         }
     }
 }

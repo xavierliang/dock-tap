@@ -100,6 +100,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func menuWillOpen(_ menu: NSMenu) {
+        guard menu === statusMenu else {
+            return
+        }
         refreshDock(reason: "menu")
     }
 
@@ -177,54 +180,67 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func rebuildMenu() {
         statusMenu.removeAllItems()
 
-        let summary = dockSlotStore.summary()
         let loginStatus = loginItemController.status()
         let loginMenuModel = LoginItemMenuModel(status: loginStatus, failureMessage: lastLoginItemFailure)
-        statusMenu.addItem(disabledItem(
-            "Accessibility: \(isAccessibilityTrusted ? "trusted" : "missing") | Tap: \(didInstallTap ? "ready" : "not ready") | Dock slots: \(summary.slotCount) | Login: \(loginStatus.displayValue)"
-        ))
-        for hint in loginMenuModel.hintRows {
-            statusMenu.addItem(disabledItem(hint))
-        }
+        let menuModel = MenuContentModel(
+            dockRows: dockSlotStore.menuRows(),
+            selectedPreset: selectedTriggerModifierPreset,
+            isAccessibilityTrusted: isAccessibilityTrusted,
+            isEventTapReady: didInstallTap
+        )
+
+        statusMenu.addItem(disabledItem(menuModel.summaryTitle))
         statusMenu.addItem(.separator())
 
-        let rowsByIndex = Dictionary(uniqueKeysWithValues: dockSlotStore.menuRows().map { ($0.target.shortcutIndex, $0) })
-        for shortcutIndex in 0..<10 {
-            if let row = rowsByIndex[shortcutIndex] {
-                statusMenu.addItem(disabledItem(slotTitle(row: row)))
-            } else {
-                let label = selectedTriggerModifierPreset.shortcutLabel(forShortcutIndex: shortcutIndex)
-                statusMenu.addItem(disabledItem("\(label)  Unassigned"))
-            }
+        for row in menuModel.exampleRows {
+            statusMenu.addItem(disabledItem(row.title))
         }
 
         statusMenu.addItem(.separator())
-        statusMenu.addItem(disabledItem("\(selectedTriggerModifierPreset.shortcutLabel(forKeyLabel: "`"))  Finder"))
+        statusMenu.addItem(mappingMenuItem(menuModel))
+        statusMenu.addItem(triggerModifierMenuItem(menuModel))
         statusMenu.addItem(.separator())
-        statusMenu.addItem(disabledItem("Trigger Modifier"))
-        for preset in TriggerModifierPreset.allCases {
-            let item = commandItem(title: preset.menuTitle, action: #selector(selectTriggerModifierPreset), keyEquivalent: "")
-            item.representedObject = preset.rawValue
-            item.state = preset == selectedTriggerModifierPreset ? .on : .off
-            statusMenu.addItem(item)
-        }
-        statusMenu.addItem(.separator())
+
         let loginItem = commandItem(title: loginMenuModel.title, action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
         loginItem.state = loginMenuModel.isChecked ? .on : .off
         statusMenu.addItem(loginItem)
+        for hint in loginMenuModel.hintRows {
+            statusMenu.addItem(disabledItem(hint))
+        }
+        if let title = menuModel.checkAccessibilityTitle {
+            statusMenu.addItem(commandItem(title: title, action: #selector(checkPermissionFromMenu), keyEquivalent: ""))
+        }
+        if let title = menuModel.openAccessibilitySettingsTitle {
+            statusMenu.addItem(commandItem(title: title, action: #selector(openAccessibilitySettingsFromMenu), keyEquivalent: ""))
+        }
+
+        statusMenu.addItem(commandItem(title: menuModel.updateDockShortcutsTitle, action: #selector(refreshDockFromMenu), keyEquivalent: "r"))
+        statusMenu.addItem(commandItem(title: menuModel.showLogsTitle, action: #selector(showLogs), keyEquivalent: "l"))
         statusMenu.addItem(.separator())
-        statusMenu.addItem(commandItem(title: "Refresh Dock", action: #selector(refreshDockFromMenu), keyEquivalent: "r"))
-        statusMenu.addItem(commandItem(title: "Show Logs", action: #selector(showLogs), keyEquivalent: "l"))
-        statusMenu.addItem(commandItem(title: "Check Accessibility", action: #selector(checkPermissionFromMenu), keyEquivalent: ""))
-        statusMenu.addItem(commandItem(title: "Open Accessibility Settings", action: #selector(openAccessibilitySettingsFromMenu), keyEquivalent: ""))
-        statusMenu.addItem(.separator())
-        statusMenu.addItem(commandItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
+        statusMenu.addItem(commandItem(title: menuModel.quitTitle, action: #selector(quit), keyEquivalent: "q"))
     }
 
-    private func slotTitle(row: DockSlotMenuRow) -> String {
-        let target = row.target
-        let label = selectedTriggerModifierPreset.shortcutLabel(forShortcutIndex: target.shortcutIndex)
-        return "\(label)  \(target.displayName) [\(row.status.rawValue)]"
+    private func mappingMenuItem(_ menuModel: MenuContentModel) -> NSMenuItem {
+        let item = NSMenuItem(title: menuModel.showDockMappingTitle, action: nil, keyEquivalent: "")
+        let submenu = NSMenu(title: menuModel.showDockMappingTitle)
+        for row in menuModel.mappingRows {
+            submenu.addItem(disabledItem(row.title))
+        }
+        item.submenu = submenu
+        return item
+    }
+
+    private func triggerModifierMenuItem(_ menuModel: MenuContentModel) -> NSMenuItem {
+        let item = NSMenuItem(title: menuModel.triggerModifierTitle, action: nil, keyEquivalent: "")
+        let submenu = NSMenu(title: AppText.Menu.triggerModifier)
+        for row in menuModel.triggerRows {
+            let presetItem = commandItem(title: row.title, action: #selector(selectTriggerModifierPreset), keyEquivalent: "")
+            presetItem.representedObject = row.preset.rawValue
+            presetItem.state = row.isSelected ? .on : .off
+            submenu.addItem(presetItem)
+        }
+        item.submenu = submenu
+        return item
     }
 
     private func disabledItem(_ title: String) -> NSMenuItem {

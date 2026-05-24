@@ -26,6 +26,6 @@ final class LoginItemMenuModelTests: XCTestCase {
 
         XCTAssertEqual(model.title, "Launch at Login")
         XCTAssertFalse(model.isChecked)
-        XCTAssertEqual(model.hintRows, ["Login item: failed to enable Launch at Login: register failed"])
+        XCTAssertEqual(model.hintRows, ["Launch at Login change failed"])
     }
 }

@@ -18,7 +18,6 @@ final class DockSlotStore {
 
     private var targets: [DockSlotTarget] = []
     private var workspaceState = WorkspaceAppState.empty
-    private var lastSkippedCount = 0
 
     init(reader: DockPreferencesReader = DockPreferencesReader()) {
         self.reader = reader
@@ -27,18 +26,17 @@ final class DockSlotStore {
     @discardableResult
     func refreshFromDockPreferences() -> DockPreferencesParseResult {
         let result = reader.readCurrentDockApps()
-        replace(entries: result.apps, skippedCount: result.skippedCount)
+        replace(entries: result.apps)
         return result
     }
 
-    func replace(entries: [DockAppEntry], skippedCount: Int = 0) {
+    func replace(entries: [DockAppEntry]) {
         let newTargets = entries.prefix(10).enumerated().map { shortcutIndex, entry in
             Self.makeTarget(entry: entry, shortcutIndex: shortcutIndex)
         }
 
         lock.lock()
         targets = newTargets
-        lastSkippedCount = skippedCount
         lock.unlock()
     }
 
@@ -64,12 +62,6 @@ final class DockSlotStore {
         return currentTargets.map { target in
             DockSlotMenuRow(target: target, status: status(for: target, state: state))
         }
-    }
-
-    func summary() -> (slotCount: Int, skippedCount: Int) {
-        lock.lock()
-        defer { lock.unlock() }
-        return (targets.count, lastSkippedCount)
     }
 
     private static func makeTarget(entry: DockAppEntry, shortcutIndex: Int) -> DockSlotTarget {

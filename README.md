@@ -18,6 +18,12 @@ Dock Tap needs Accessibility access for the packaged, signed `DockTap.app`. Beca
 
 If the menu shows Accessibility as missing, choose `Check Accessibility` to prompt again or `Open Accessibility Settings` and enable the signed app entry manually.
 
+## Menu
+
+The main menu shows current readiness, the selected trigger preset, and how many Dock shortcuts are assigned. It includes four examples for the shortcut rule, while the full ten-slot list lives under `Show Dock Mapping`.
+
+Dock shortcuts update automatically on launch and each time the main menu opens. Use `Update Dock Shortcuts` as a manual fallback after changing Dock contents.
+
 ## Trigger Presets
 
 The trigger modifier is fixed to one of five physical presets:
@@ -38,4 +44,4 @@ The menu reads Launch at Login state from `SMAppService.mainApp.status`. If macO
 
 ## Known Limits
 
-Dock Tap reads Dock preferences on refresh/menu open and does not mutate Dock contents. It does not cycle windows, remap slots, support Custom triggers, notarize releases, or install an updater.
+Dock Tap reads Dock preferences on launch/menu open and does not mutate Dock contents. It does not cycle windows, remap slots, support Custom triggers, notarize releases, or install an updater.
