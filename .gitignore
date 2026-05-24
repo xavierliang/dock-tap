@@ -3,12 +3,22 @@
 # SwiftPM and local build output
 .build/
 build/
+dist/
+.swiftpm/
 
 # Xcode/user-local metadata
 DerivedData/
 *.xcuserdata/
 *.xcuserstate
+*.xcresult/
+*.dSYM/
 
 # Logs and temporary files
 *.log
 *.tmp
+
+# Local secrets and signing/notarization material
+.env
+.env.*
+AuthKey_*.p8
+*.p8
