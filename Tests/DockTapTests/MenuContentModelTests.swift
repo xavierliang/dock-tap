@@ -2,7 +2,7 @@ import XCTest
 @testable import DockTap
 
 final class MenuContentModelTests: XCTestCase {
-    func testExamplesAreGenericAndDoNotListDockApps() {
+    func testExamplesOnlyListFinderShortcut() {
         let model = MenuContentModel(
             dockRows: (0..<10).map { row(index: $0, name: "Dock App \($0 + 1)") },
             selectedPreset: .leftOption,
@@ -13,9 +13,6 @@ final class MenuContentModelTests: XCTestCase {
         XCTAssertEqual(
             model.exampleRows.map(\.title),
             [
-                "Left Option+1  First Dock app",
-                "Left Option+2  Second Dock app",
-                "Left Option+0  Tenth Dock app",
                 "Left Option+`  Finder"
             ]
         )

@@ -77,9 +77,6 @@ struct MenuContentModel: Equatable {
 
     private static func exampleRows(selectedPreset: TriggerModifierPreset) -> [ExampleRow] {
         [
-            ExampleRow(title: "\(selectedPreset.shortcutLabel(forShortcutIndex: 0))  \(AppText.DockShortcuts.firstDockApp)"),
-            ExampleRow(title: "\(selectedPreset.shortcutLabel(forShortcutIndex: 1))  \(AppText.DockShortcuts.secondDockApp)"),
-            ExampleRow(title: "\(selectedPreset.shortcutLabel(forShortcutIndex: 9))  \(AppText.DockShortcuts.tenthDockApp)"),
             ExampleRow(title: "\(selectedPreset.shortcutLabel(forKeyLabel: "`"))  \(AppText.DockShortcuts.finder)")
         ]
     }

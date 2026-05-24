@@ -5,9 +5,6 @@ enum AppText {
     }
 
     enum DockShortcuts {
-        static let firstDockApp = "First Dock app"
-        static let secondDockApp = "Second Dock app"
-        static let tenthDockApp = "Tenth Dock app"
         static let finder = "Finder"
         static let unassigned = "Unassigned"
 

@@ -20,7 +20,7 @@ If the menu shows Accessibility as missing, choose `Check Accessibility` to prom
 
 ## Menu
 
-The main menu shows current readiness, the selected trigger preset, and how many Dock shortcuts are assigned. It includes four examples for the shortcut rule, while the full ten-slot list lives under `Show Dock Mapping`.
+The main menu shows current readiness, the selected trigger preset, and how many Dock shortcuts are assigned. It includes the Finder shortcut example, while the full ten-slot Dock list lives under `Show Dock Mapping`.
 
 Dock shortcuts update automatically on launch and each time the main menu opens. Use `Update Dock Shortcuts` as a manual fallback after changing Dock contents.
 
