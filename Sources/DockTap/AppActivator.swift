@@ -10,9 +10,9 @@ enum AppActivationRoute: Equatable {
     case missingSlot(DockSlotTarget)
     case activateSlot(DockSlotTarget)
     case launchSlot(DockSlotTarget)
-    case activateFinder
-    case launchFinder(URL)
-    case finderUnavailable
+    case activateFinder(shortcutLabel: String)
+    case launchFinder(URL, shortcutLabel: String)
+    case finderUnavailable(shortcutLabel: String)
 }
 
 final class AppActivator {
@@ -35,7 +35,7 @@ final class AppActivator {
 
     static func route(for intent: ShortcutIntent, context: AppActivationContext) -> AppActivationRoute {
         switch intent {
-        case .dockSlot(let target):
+        case .dockSlot(let target, shortcutLabel: _):
             if target.isMissing {
                 return .missingSlot(target)
             }
@@ -43,14 +43,14 @@ final class AppActivator {
                 return .activateSlot(target)
             }
             return .launchSlot(target)
-        case .finder:
+        case .finder(shortcutLabel: let shortcutLabel):
             if context.finderIsRunning {
-                return .activateFinder
+                return .activateFinder(shortcutLabel: shortcutLabel)
             }
             if let finderURL = context.finderURL {
-                return .launchFinder(finderURL)
+                return .launchFinder(finderURL, shortcutLabel: shortcutLabel)
             }
-            return .finderUnavailable
+            return .finderUnavailable(shortcutLabel: shortcutLabel)
         }
     }
 
@@ -63,12 +63,12 @@ final class AppActivator {
             activateSlot(target)
         case .launchSlot(let target):
             launchSlot(target)
-        case .activateFinder:
-            activateFinder()
-        case .launchFinder(let finderURL):
-            launchFinder(at: finderURL)
-        case .finderUnavailable:
-            logStore.append("action start Finder shortcut=leftOption+`")
+        case .activateFinder(let shortcutLabel):
+            activateFinder(shortcutLabel: shortcutLabel)
+        case .launchFinder(let finderURL, let shortcutLabel):
+            launchFinder(at: finderURL, shortcutLabel: shortcutLabel)
+        case .finderUnavailable(let shortcutLabel):
+            logStore.append("action start Finder shortcut=\(shortcutLabel)")
             logStore.append("action failed Finder app URL unavailable")
         }
     }
@@ -100,8 +100,8 @@ final class AppActivator {
         }
     }
 
-    private func activateFinder() {
-        logStore.append("action start Finder shortcut=leftOption+`")
+    private func activateFinder(shortcutLabel: String) {
+        logStore.append("action start Finder shortcut=\(shortcutLabel)")
 
         guard let finder = NSRunningApplication.runningApplications(withBundleIdentifier: Self.finderBundleID).first else {
             logStore.append("action activate failed Finder running app unavailable")
@@ -112,8 +112,8 @@ final class AppActivator {
         logStore.append("action \(activated ? "activated" : "activate failed") Finder")
     }
 
-    private func launchFinder(at finderURL: URL) {
-        logStore.append("action start Finder shortcut=leftOption+`")
+    private func launchFinder(at finderURL: URL, shortcutLabel: String) {
+        logStore.append("action start Finder shortcut=\(shortcutLabel)")
 
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = true

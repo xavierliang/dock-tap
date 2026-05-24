@@ -5,10 +5,11 @@ final class EventTapController {
     private let logStore: LogStore
     private let onShortcut: (ShortcutIntent) -> Void
     private let decider = KeyEventDecider()
-    private let slotLock = NSLock()
+    private let inputLock = NSLock()
     private let tapLock = NSLock()
 
     private var slotSnapshot = DockSlotSnapshot.empty
+    private var triggerModifierPreset = TriggerModifierPreset.defaultPreset
     private var modifierState = ModifierState()
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -21,9 +22,15 @@ final class EventTapController {
     }
 
     func updateSlotSnapshot(_ snapshot: DockSlotSnapshot) {
-        slotLock.lock()
+        inputLock.lock()
         slotSnapshot = snapshot
-        slotLock.unlock()
+        inputLock.unlock()
+    }
+
+    func updateTriggerModifierPreset(_ preset: TriggerModifierPreset) {
+        inputLock.lock()
+        triggerModifierPreset = preset
+        inputLock.unlock()
     }
 
     func install() -> Bool {
@@ -100,11 +107,13 @@ final class EventTapController {
         case .keyDown, .keyUp:
             let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
             modifierState.resync(readKeyDown: Self.isKeyDown)
+            let input = currentInputSnapshot()
             let decision = decider.decide(
                 kind: type == .keyDown ? .keyDown : .keyUp,
                 keyCode: keyCode,
                 modifiers: modifierState.snapshot,
-                slots: currentSlotSnapshot()
+                triggerModifier: input.triggerModifierPreset,
+                slots: input.slotSnapshot
             )
             if let intent = decision.intent {
                 enqueueShortcut(intent)
@@ -122,10 +131,10 @@ final class EventTapController {
         }
     }
 
-    private func currentSlotSnapshot() -> DockSlotSnapshot {
-        slotLock.lock()
-        defer { slotLock.unlock() }
-        return slotSnapshot
+    private func currentInputSnapshot() -> (slotSnapshot: DockSlotSnapshot, triggerModifierPreset: TriggerModifierPreset) {
+        inputLock.lock()
+        defer { inputLock.unlock() }
+        return (slotSnapshot, triggerModifierPreset)
     }
 
     private func runTapThread(installResult: TapInstallResult) {

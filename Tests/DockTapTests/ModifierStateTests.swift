@@ -44,16 +44,31 @@ final class ModifierStateTests: XCTestCase {
         XCTAssertTrue(state.snapshot.leftOption)
         XCTAssertTrue(state.snapshot.capsLock)
         XCTAssertTrue(state.snapshot.function)
-        XCTAssertFalse(state.snapshot.hasRejectingExtraModifier)
+        XCTAssertTrue(TriggerModifierPreset.leftOption.matches(state.snapshot))
     }
 
-    func testShiftCommandControlAndRightOptionRejectRules() {
+    func testPhysicalModifierLookupReadsTrackedSideKeys() {
         var state = ModifierState()
-        state.setPhysicalKey(KeyCodes.rightOption, isDown: true)
-        state.setPhysicalKey(KeyCodes.leftShift, isDown: true)
-        state.setPhysicalKey(KeyCodes.rightCommand, isDown: true)
-        state.setPhysicalKey(KeyCodes.leftControl, isDown: true)
+        let trackedKeys = [
+            KeyCodes.leftOption,
+            KeyCodes.rightOption,
+            KeyCodes.leftShift,
+            KeyCodes.rightShift,
+            KeyCodes.leftCommand,
+            KeyCodes.rightCommand,
+            KeyCodes.leftControl,
+            KeyCodes.rightControl,
+            KeyCodes.capsLock,
+            KeyCodes.function
+        ]
 
-        XCTAssertTrue(state.snapshot.hasRejectingExtraModifier)
+        for keyCode in trackedKeys {
+            state.setPhysicalKey(keyCode, isDown: true)
+            XCTAssertTrue(state.snapshot.isPhysicalModifierDown(keyCode), KeyCodes.label(for: keyCode))
+            state.setPhysicalKey(keyCode, isDown: false)
+            XCTAssertFalse(state.snapshot.isPhysicalModifierDown(keyCode), KeyCodes.label(for: keyCode))
+        }
+
+        XCTAssertFalse(state.snapshot.isPhysicalModifierDown(KeyCodes.one))
     }
 }

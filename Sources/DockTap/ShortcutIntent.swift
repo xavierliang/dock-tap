@@ -1,22 +1,21 @@
 import Foundation
 
 enum ShortcutIntent: Equatable {
-    case dockSlot(DockSlotTarget)
-    case finder
+    case dockSlot(DockSlotTarget, shortcutLabel: String)
+    case finder(shortcutLabel: String)
 
     var label: String {
         switch self {
-        case .dockSlot(let target):
-            target.shortcutLabel
-        case .finder:
-            "leftOption+`"
+        case .dockSlot(_, let shortcutLabel):
+            shortcutLabel
+        case .finder(let shortcutLabel):
+            shortcutLabel
         }
     }
 }
 
 struct DockSlotTarget: Equatable {
     let id: String
-    let shortcutLabel: String
     let shortcutIndex: Int
     let dockOrdinal: Int
     let appURL: URL

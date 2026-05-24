@@ -9,7 +9,7 @@
     <key>CFBundleExecutable</key>
     <string>DockTap</string>
     <key>CFBundleIdentifier</key>
-    <string>dev.local.DockTap</string>
+    <string>ai.resopod.docktap</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>

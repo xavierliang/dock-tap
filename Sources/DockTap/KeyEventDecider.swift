@@ -24,6 +24,7 @@ struct KeyEventDecider {
         kind: KeyEventKind,
         keyCode: UInt16,
         modifiers: ModifierSnapshot,
+        triggerModifier: TriggerModifierPreset,
         slots: DockSlotSnapshot
     ) -> KeyEventDecision {
         guard kind == .keyDown else {
@@ -33,6 +34,7 @@ struct KeyEventDecider {
         let intent = matcher.matchKeyDown(
             keyCode: keyCode,
             modifiers: modifiers,
+            triggerModifier: triggerModifier,
             slots: slots
         )
 

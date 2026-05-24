@@ -12,11 +12,31 @@ struct ModifierSnapshot: Equatable {
     var capsLock = false
     var function = false
 
-    var hasRejectingExtraModifier: Bool {
-        rightOption ||
-            leftShift || rightShift ||
-            leftCommand || rightCommand ||
-            leftControl || rightControl
+    func isPhysicalModifierDown(_ keyCode: UInt16) -> Bool {
+        switch keyCode {
+        case KeyCodes.leftOption:
+            leftOption
+        case KeyCodes.rightOption:
+            rightOption
+        case KeyCodes.leftShift:
+            leftShift
+        case KeyCodes.rightShift:
+            rightShift
+        case KeyCodes.leftCommand:
+            leftCommand
+        case KeyCodes.rightCommand:
+            rightCommand
+        case KeyCodes.leftControl:
+            leftControl
+        case KeyCodes.rightControl:
+            rightControl
+        case KeyCodes.capsLock:
+            capsLock
+        case KeyCodes.function:
+            function
+        default:
+            false
+        }
     }
 }
 

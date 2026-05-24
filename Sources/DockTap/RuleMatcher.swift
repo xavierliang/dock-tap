@@ -17,9 +17,10 @@ struct RuleMatcher {
     func matchKeyDown(
         keyCode: UInt16,
         modifiers: ModifierSnapshot,
+        triggerModifier: TriggerModifierPreset,
         slots: DockSlotSnapshot
     ) -> ShortcutIntent? {
-        guard modifiers.leftOption, !modifiers.hasRejectingExtraModifier else {
+        guard triggerModifier.matches(modifiers) else {
             return nil
         }
 
@@ -27,11 +28,14 @@ struct RuleMatcher {
             guard let target = slots.target(shortcutIndex: shortcutIndex) else {
                 return nil
             }
-            return .dockSlot(target)
+            return .dockSlot(
+                target,
+                shortcutLabel: triggerModifier.shortcutLabel(forShortcutIndex: shortcutIndex)
+            )
         }
 
         if keyCode == KeyCodes.backtick {
-            return .finder
+            return .finder(shortcutLabel: triggerModifier.shortcutLabel(forKeyLabel: "`"))
         }
 
         return nil

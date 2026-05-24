@@ -1,4 +1,5 @@
 import ApplicationServices
+import AppKit
 
 struct PermissionGate {
     func isTrusted(prompt: Bool) -> Bool {
@@ -9,5 +10,12 @@ struct PermissionGate {
         }
 
         return AXIsProcessTrusted()
+    }
+
+    func openAccessibilitySettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") else {
+            return
+        }
+        NSWorkspace.shared.open(url)
     }
 }

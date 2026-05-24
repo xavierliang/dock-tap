@@ -40,12 +40,13 @@ final class AppActivatorTests: XCTestCase {
             kind: .keyDown,
             keyCode: KeyCodes.one,
             modifiers: modifiers,
+            triggerModifier: .leftOption,
             slots: snapshot
         )
 
         guard let intent = decision.intent else {
             XCTFail("expected first slot intent")
-            return .finder
+            return .finder(shortcutLabel: "Left Option+`")
         }
         return intent
     }

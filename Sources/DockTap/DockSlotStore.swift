@@ -72,21 +72,9 @@ final class DockSlotStore {
         return (targets.count, lastSkippedCount)
     }
 
-    static func shortcutLabel(for shortcutIndex: Int) -> String {
-        switch shortcutIndex {
-        case 0...8:
-            "leftOption+\(shortcutIndex + 1)"
-        case 9:
-            "leftOption+0"
-        default:
-            "leftOption+?"
-        }
-    }
-
     private static func makeTarget(entry: DockAppEntry, shortcutIndex: Int) -> DockSlotTarget {
         DockSlotTarget(
             id: "slot-\(shortcutIndex)-dock-\(entry.dockOrdinal)-\(entry.appURL.path)",
-            shortcutLabel: shortcutLabel(for: shortcutIndex),
             shortcutIndex: shortcutIndex,
             dockOrdinal: entry.dockOrdinal,
             appURL: entry.appURL,
