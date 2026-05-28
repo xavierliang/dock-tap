@@ -1,10 +1,10 @@
 .DS_Store
 
 # SwiftPM and local build output
-.build/
-build/
-dist/
-.swiftpm/
+/.build/
+/build/
+/dist/
+/.swiftpm/
 
 # Xcode/user-local metadata
 DerivedData/
