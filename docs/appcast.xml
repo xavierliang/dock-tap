@@ -1,9 +1,16 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" standalone="yes"?>
 <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
-        <title>Dock Tap</title>
-        <link>https://xavierliang.github.io/dock-tap/appcast.xml</link>
-        <description>Dock Tap release feed</description>
-        <language>en</language>
+        <title>DockTap</title>
+        <item>
+            <title>0.2.0</title>
+            <pubDate>Thu, 28 May 2026 11:49:48 -0600</pubDate>
+            <link>https://github.com/xavierliang/dock-tap</link>
+            <sparkle:version>2</sparkle:version>
+            <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/xavierliang/dock-tap/releases/download/v0.2.0/DockTap-0.2.0-arm64.dmg" length="2980668" type="application/octet-stream" sparkle:edSignature="9t6I30FgRfmR3OZT0b4jqI0FkETa8XubPjaLRSItE7DdVAD4/YN0LqUxvg+aOsP6XWQ2lSWWoPi/WD23t/loBg=="/>
+        </item>
     </channel>
 </rss>
