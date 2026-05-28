@@ -2,39 +2,39 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleDevelopmentRegion</key>
-    <string>en</string>
-    <key>CFBundleDisplayName</key>
-    <string>Dock Tap</string>
-    <key>CFBundleExecutable</key>
-    <string>DockTap</string>
-    <key>CFBundleIconFile</key>
-    <string>DockTap</string>
-    <key>CFBundleIdentifier</key>
-    <string>ai.resopod.docktap</string>
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
-    <key>CFBundleName</key>
-    <string>DockTap</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Dock Tap</string>
+	<key>CFBundleExecutable</key>
+	<string>DockTap</string>
+	<key>CFBundleIconFile</key>
+	<string>DockTap</string>
+	<key>CFBundleIdentifier</key>
+	<string>ai.resopod.docktap</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>DockTap</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.1</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>13.0</string>
-    <key>LSUIElement</key>
-    <true/>
-    <key>NSHumanReadableCopyright</key>
-    <string>Dock Tap</string>
-    <key>SUFeedURL</key>
-    <string>https://xavierliang.github.io/dock-tap/appcast.xml</string>
-    <key>SUPublicEDKey</key>
-    <string>MH4l9GYoFZwvf0H53B8cxmrrKbrp4+WZo5fsilzvDMM=</string>
-    <key>SUEnableAutomaticChecks</key>
-    <true/>
-    <key>SUScheduledCheckInterval</key>
-    <integer>86400</integer>
+	<string>0.2.0</string>
+	<key>CFBundleVersion</key>
+	<string>2</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>Dock Tap</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://xavierliang.github.io/dock-tap/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>MH4l9GYoFZwvf0H53B8cxmrrKbrp4+WZo5fsilzvDMM=</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 </dict>
 </plist>
