@@ -21,8 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let statusMenu = NSMenu()
     private var logWindowController: LogWindowController?
     private var eventTapController: EventTapController?
-    private var permissionTimer: Timer?
-    private var didInstallTap = false
+    private var healthReconcileTimer: Timer?
     private var isAccessibilityTrusted = false
     private var selectedTriggerModifierPreset = TriggerModifierPreset.defaultPreset
     private var windowActionsEnabled = false
@@ -38,6 +37,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         eventTapController = EventTapController(logStore: logStore) { [weak self] intent in
             self?.handleShortcut(intent)
         }
+        eventTapController?.onReadinessChanged = { [weak self] _ in
+            self?.rebuildMenu()
+        }
+        eventTapController?.onReconcileRequested = { [weak self] in
+            self?.reconcilePermissionAndTapHealth(prompt: false, reason: "tap recovery")
+        }
         eventTapController?.updateTriggerModifierPreset(selectedTriggerModifierPreset)
         eventTapController?.updateWindowActionsEnabled(windowActionsEnabled)
 
@@ -47,12 +52,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         refreshDock(reason: "launch")
-        checkPermission(prompt: true)
+        startHealthReconcileTimer()
+        reconcilePermissionAndTapHealth(prompt: true, reason: "launch")
         _ = updateController
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        permissionTimer?.invalidate()
+        healthReconcileTimer?.invalidate()
         activeAppProvider.stop()
         eventTapController?.stop()
     }
@@ -160,46 +166,67 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func checkPermission(prompt: Bool) {
-        let trusted = permissionGate.isTrusted(prompt: prompt)
-        let changed = isAccessibilityTrusted != trusted
-        isAccessibilityTrusted = trusted
+        reconcilePermissionAndTapHealth(prompt: prompt, reason: prompt ? "manual" : "timer")
+    }
 
-        guard trusted else {
-            if changed || prompt {
-                logStore.append("permission missing: grant Accessibility access to the signed DockTap.app bundle=\(bundleIdentifier)")
-            }
-            rebuildMenu()
-            schedulePermissionRecheck()
+    private func startHealthReconcileTimer() {
+        guard healthReconcileTimer == nil else {
             return
         }
 
-        if changed || prompt {
+        let timer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            self?.checkPermission(prompt: false)
+        }
+        timer.tolerance = 1.0
+        healthReconcileTimer = timer
+    }
+
+    private func reconcilePermissionAndTapHealth(prompt: Bool, reason: String) {
+        let trusted = permissionGate.isTrusted(prompt: prompt)
+        let trustChanged = isAccessibilityTrusted != trusted
+        isAccessibilityTrusted = trusted
+        let tapReady = eventTapController?.isReady == true
+        let decision = TapHealthReconciler.evaluate(
+            isAccessibilityTrusted: trusted,
+            isEventTapReady: tapReady
+        )
+
+        guard trusted else {
+            if trustChanged || prompt {
+                logStore.append("permission missing: grant Accessibility access to the signed DockTap.app bundle=\(bundleIdentifier)")
+            }
+            if decision.shouldStopTap {
+                eventTapController?.stop()
+            }
+            rebuildMenu()
+            return
+        }
+
+        if trustChanged || prompt {
             logStore.append("permission trusted: Accessibility access granted")
         }
 
-        if !didInstallTap {
-            eventTapController?.updateSlotSnapshot(dockSlotStore.snapshot())
-            guard eventTapController?.install() == true else {
+        guard decision.shouldInstallTap else {
+            if trustChanged || prompt {
                 rebuildMenu()
-                schedulePermissionRecheck()
-                return
             }
-            didInstallTap = true
-            rebuildMenu()
-        }
-
-        permissionTimer?.invalidate()
-        permissionTimer = nil
-    }
-
-    private func schedulePermissionRecheck() {
-        guard permissionTimer == nil else {
             return
         }
 
-        permissionTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            self?.checkPermission(prompt: false)
+        if decision.shouldUpdateSlotSnapshot {
+            eventTapController?.updateSlotSnapshot(dockSlotStore.snapshot())
         }
+
+        let didInstall = eventTapController?.install() == true
+        let postInstallDecision = TapHealthReconciler.evaluate(
+            isAccessibilityTrusted: trusted,
+            isEventTapReady: eventTapController?.isReady == true,
+            installAttempt: didInstall ? .succeeded : .failed
+        )
+        if postInstallDecision.shouldRetryInstall {
+            logStore.append("tap install not ready after \(reason); will retry during health reconcile")
+        }
+        rebuildMenu()
     }
 
     private func refreshDock(reason: String) {
@@ -233,7 +260,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             dockRows: dockSlotStore.menuRows(),
             selectedPreset: selectedTriggerModifierPreset,
             isAccessibilityTrusted: isAccessibilityTrusted,
-            isEventTapReady: didInstallTap,
+            isEventTapReady: eventTapController?.isReady == true,
             windowActionsEnabled: windowActionsEnabled,
             appName: appName,
             appVersion: appVersion,

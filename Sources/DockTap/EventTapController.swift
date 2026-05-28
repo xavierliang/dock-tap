@@ -1,6 +1,13 @@
 import CoreGraphics
 import Foundation
 
+enum EventTapReadiness: Equatable {
+    case stopped
+    case installing
+    case ready
+    case recovering
+}
+
 final class EventTapController {
     private let logStore: LogStore
     private let onShortcut: (ShortcutIntent) -> Void
@@ -16,6 +23,21 @@ final class EventTapController {
     private var runLoopSource: CFRunLoopSource?
     private var tapRunLoop: CFRunLoop?
     private var tapThread: Thread?
+    private var tapReadiness = EventTapReadiness.stopped
+    private var tapGeneration: UInt64 = 0
+
+    var onReadinessChanged: ((EventTapReadiness) -> Void)?
+    var onReconcileRequested: (() -> Void)?
+
+    var readiness: EventTapReadiness {
+        tapLock.lock()
+        defer { tapLock.unlock() }
+        return tapReadiness
+    }
+
+    var isReady: Bool {
+        readiness == .ready
+    }
 
     init(logStore: LogStore, onShortcut: @escaping (ShortcutIntent) -> Void) {
         self.logStore = logStore
@@ -41,9 +63,18 @@ final class EventTapController {
     }
 
     func install() -> Bool {
-        guard !isTapRunningOrInstalling() else {
-            logStore.append("tap already installed")
-            return true
+        if readiness == .recovering {
+            stop()
+        }
+
+        guard let generation = reserveTapInstall() else {
+            let currentReadiness = readiness
+            if currentReadiness == .installing {
+                logStore.append("tap install already in progress")
+            } else {
+                logStore.append("tap already installed")
+            }
+            return currentReadiness == .ready
         }
 
         let installResult = TapInstallResult()
@@ -52,26 +83,31 @@ final class EventTapController {
                 installResult.finish(success: false, message: "tap failed: controller was released before install")
                 return
             }
-            self.runTapThread(installResult: installResult)
+            self.runTapThread(installResult: installResult, generation: generation)
         }
         thread.name = "DockTap Event Tap"
 
-        tapLock.lock()
-        tapThread = thread
-        tapLock.unlock()
+        guard storeTapThread(thread, generation: generation) else {
+            installResult.finish(success: false, message: "tap failed: install was cancelled before thread start")
+            return false
+        }
         thread.start()
 
         let result = installResult.wait(timeout: 2.0)
         logStore.append(result.message)
         if !result.success {
-            clearTapState()
+            clearTapState(generation: generation, invalidateGeneration: true)
         }
-        return result.success
+        return result.success && isReady
     }
 
     func stop() {
         let state = currentTapState()
         guard let tap = state.tap else {
+            if state.readiness != .stopped || state.hasThread {
+                clearTapState(generation: state.generation, invalidateGeneration: true)
+                logStore.append("tap stopped")
+            }
             return
         }
 
@@ -82,7 +118,7 @@ final class EventTapController {
             CFRunLoopWakeUp(runLoop)
         }
         CFMachPortInvalidate(tap)
-        clearTapState()
+        clearTapState(generation: state.generation, invalidateGeneration: true)
         logStore.append("tap stopped")
     }
 
@@ -149,7 +185,7 @@ final class EventTapController {
         return (slotSnapshot, triggerModifierPreset, windowActionsEnabled)
     }
 
-    private func runTapThread(installResult: TapInstallResult) {
+    private func runTapThread(installResult: TapInstallResult, generation: UInt64) {
         let mask = Self.eventMask(.keyDown, .keyUp, .flagsChanged)
 
         guard let tap = CGEvent.tapCreate(
@@ -166,8 +202,9 @@ final class EventTapController {
             )
             return
         }
-        guard !installResult.isAbandoned else {
+        guard !installResult.isAbandoned, isCurrentTapGeneration(generation) else {
             CFMachPortInvalidate(tap)
+            installResult.finish(success: false, message: "tap failed: install was cancelled before activation")
             return
         }
 
@@ -176,8 +213,9 @@ final class EventTapController {
             installResult.finish(success: false, message: "tap failed: could not create run loop source")
             return
         }
-        guard !installResult.isAbandoned else {
+        guard !installResult.isAbandoned, isCurrentTapGeneration(generation) else {
             CFMachPortInvalidate(tap)
+            installResult.finish(success: false, message: "tap failed: install was cancelled before activation")
             return
         }
 
@@ -186,40 +224,48 @@ final class EventTapController {
             installResult.finish(success: false, message: "tap failed: could not get current run loop")
             return
         }
-        guard !installResult.isAbandoned else {
+        guard !installResult.isAbandoned, isCurrentTapGeneration(generation) else {
             CFMachPortInvalidate(tap)
+            installResult.finish(success: false, message: "tap failed: install was cancelled before activation")
             return
         }
 
-        guard storeTapIfActive(tap: tap, source: source, runLoop: runLoop, installResult: installResult) else {
+        guard storeTapIfActive(tap: tap, source: source, runLoop: runLoop, installResult: installResult, generation: generation) else {
             CFMachPortInvalidate(tap)
-            return
-        }
-
-        guard installResult.finish(
-            success: true,
-            message: "tap installed: active session keyboard tap enabled on dedicated run loop"
-        ) else {
-            CFMachPortInvalidate(tap)
-            clearTapState()
+            installResult.finish(success: false, message: "tap failed: install was cancelled before activation")
             return
         }
 
         CFRunLoopAddSource(runLoop, source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
+        guard setReadiness(.ready, generation: generation) else {
+            CFMachPortInvalidate(tap)
+            installResult.finish(success: false, message: "tap failed: install was cancelled before activation")
+            return
+        }
+        guard installResult.finish(
+            success: true,
+            message: "tap installed: active session keyboard tap enabled on dedicated run loop"
+        ) else {
+            CFMachPortInvalidate(tap)
+            clearTapState(generation: generation, invalidateGeneration: true)
+            return
+        }
+
         CFRunLoopRun()
-        clearTapState()
+        clearTapState(generation: generation)
     }
 
     private func storeTapIfActive(
         tap: CFMachPort,
         source: CFRunLoopSource,
         runLoop: CFRunLoop,
-        installResult: TapInstallResult
+        installResult: TapInstallResult,
+        generation: UInt64
     ) -> Bool {
         tapLock.lock()
         defer { tapLock.unlock() }
-        guard !installResult.isAbandoned else {
+        guard !installResult.isAbandoned, tapGeneration == generation, tapReadiness == .installing else {
             return false
         }
         eventTap = tap
@@ -228,38 +274,123 @@ final class EventTapController {
         return true
     }
 
-    private func clearTapState() {
+    private func reserveTapInstall() -> UInt64? {
+        var shouldNotify = false
+        let generation: UInt64?
         tapLock.lock()
+        if tapReadiness == .ready || tapReadiness == .installing || eventTap != nil || tapThread != nil {
+            generation = nil
+        } else {
+            tapGeneration &+= 1
+            generation = tapGeneration
+            tapReadiness = .installing
+            shouldNotify = true
+        }
+        tapLock.unlock()
+
+        if shouldNotify {
+            notifyReadinessChanged(.installing)
+        }
+        return generation
+    }
+
+    private func storeTapThread(_ thread: Thread, generation: UInt64) -> Bool {
+        tapLock.lock()
+        defer { tapLock.unlock() }
+        guard tapGeneration == generation, tapReadiness == .installing else {
+            return false
+        }
+        tapThread = thread
+        return true
+    }
+
+    private func clearTapState(
+        generation expectedGeneration: UInt64? = nil,
+        readiness newReadiness: EventTapReadiness = .stopped,
+        invalidateGeneration: Bool = false
+    ) {
+        var shouldNotify = false
+        tapLock.lock()
+        if let expectedGeneration, tapGeneration != expectedGeneration {
+            tapLock.unlock()
+            return
+        }
         eventTap = nil
         runLoopSource = nil
         tapRunLoop = nil
         tapThread = nil
+        if invalidateGeneration {
+            tapGeneration &+= 1
+        }
+        if tapReadiness != newReadiness {
+            tapReadiness = newReadiness
+            shouldNotify = true
+        }
         tapLock.unlock()
+
+        if shouldNotify {
+            notifyReadinessChanged(newReadiness)
+        }
     }
 
-    private func currentTapState() -> (tap: CFMachPort?, source: CFRunLoopSource?, runLoop: CFRunLoop?) {
+    private func currentTapState() -> (
+        tap: CFMachPort?,
+        source: CFRunLoopSource?,
+        runLoop: CFRunLoop?,
+        generation: UInt64,
+        readiness: EventTapReadiness,
+        hasThread: Bool
+    ) {
         tapLock.lock()
         defer { tapLock.unlock() }
-        return (eventTap, runLoopSource, tapRunLoop)
+        return (eventTap, runLoopSource, tapRunLoop, tapGeneration, tapReadiness, tapThread != nil)
     }
 
-    private func isTapRunningOrInstalling() -> Bool {
+    private func isCurrentTapGeneration(_ generation: UInt64) -> Bool {
         tapLock.lock()
         defer { tapLock.unlock() }
-        return eventTap != nil || tapThread != nil
+        return tapGeneration == generation
+    }
+
+    @discardableResult
+    private func setReadiness(_ newReadiness: EventTapReadiness, generation expectedGeneration: UInt64? = nil) -> Bool {
+        var shouldNotify = false
+        tapLock.lock()
+        if let expectedGeneration, tapGeneration != expectedGeneration {
+            tapLock.unlock()
+            return false
+        }
+        if tapReadiness != newReadiness {
+            tapReadiness = newReadiness
+            shouldNotify = true
+        }
+        tapLock.unlock()
+
+        if shouldNotify {
+            notifyReadinessChanged(newReadiness)
+        }
+        return true
+    }
+
+    private func notifyReadinessChanged(_ readiness: EventTapReadiness) {
+        DispatchQueue.main.async { [weak self] in
+            self?.onReadinessChanged?(readiness)
+        }
     }
 
     private func scheduleTapRecovery(type: CGEventType) {
         let reason = Self.name(for: type)
-        let tap = currentTapState().tap
-        if let tap {
-            CGEvent.tapEnable(tap: tap, enable: true)
+        let state = currentTapState()
+        guard state.tap != nil else {
+            return
         }
+        _ = setReadiness(.recovering, generation: state.generation)
         DispatchQueue.main.async { [weak self] in
             guard let self else {
                 return
             }
-            self.logStore.append("tap disabled: \(reason); re-enabled")
+            self.logStore.append("tap disabled: \(reason); requesting health reconcile")
+            self.onReconcileRequested?()
         }
     }
 
