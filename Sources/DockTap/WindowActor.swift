@@ -131,11 +131,17 @@ final class WindowActor {
             return
         }
 
-        let axSizeResult = setSize(targetAppKitRect.size, on: window)
+        let axInitialSizeResult = setSize(targetAppKitRect.size, on: window)
         let axPositionResult = setPosition(targetAXOrigin, on: window)
-        let resultVerb = resultVerb(sizeResult: axSizeResult, positionResult: axPositionResult)
+        // Re-apply size after moving; the first write can be clamped at the old origin.
+        let axFinalSizeResult = setSize(targetAppKitRect.size, on: window)
+        let resultVerb = resultVerb(
+            initialSizeResult: axInitialSizeResult,
+            positionResult: axPositionResult,
+            finalSizeResult: axFinalSizeResult
+        )
         logStore.append(
-            "\(resultVerb) windowAction=\(action.rawValue) currentAppKit=\(format(currentAppKitRect)) display=\(format(display)) rectAppKit=\(format(targetAppKitRect)) originAX=\(format(targetAXOrigin)) axSizeResult=\(axSizeResult.rawValue) axPositionResult=\(axPositionResult.rawValue)"
+            "\(resultVerb) windowAction=\(action.rawValue) currentAppKit=\(format(currentAppKitRect)) display=\(format(display)) rectAppKit=\(format(targetAppKitRect)) originAX=\(format(targetAXOrigin)) axInitialSizeResult=\(axInitialSizeResult.rawValue) axPositionResult=\(axPositionResult.rawValue) axFinalSizeResult=\(axFinalSizeResult.rawValue)"
         )
     }
 
@@ -249,14 +255,18 @@ final class WindowActor {
         }
     }
 
-    private func resultVerb(sizeResult: AXError, positionResult: AXError) -> String {
-        switch (sizeResult == .success, positionResult == .success) {
-        case (true, true):
+    private func resultVerb(
+        initialSizeResult: AXError,
+        positionResult: AXError,
+        finalSizeResult: AXError
+    ) -> String {
+        switch (initialSizeResult == .success, positionResult == .success, finalSizeResult == .success) {
+        case (_, true, true):
             "action applied"
-        case (true, false), (false, true):
-            "action partial"
-        case (false, false):
+        case (false, false, false):
             "action failed"
+        default:
+            "action partial"
         }
     }
 
