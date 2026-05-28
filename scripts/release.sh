@@ -197,7 +197,8 @@ Usage: scripts/release.sh <new-version> [--notes-file PATH] [--dry-run]
 
 Options:
   --notes-file PATH  Read release notes from PATH (default: gh --generate-notes).
-  --dry-run          Bump Info.plist + build DMG, but skip commits, push, and GitHub.
+  --dry-run          Bump Info.plist, build DMG, generate appcast, and validate
+                     enclosure URLs, but skip commits, push, and GitHub release.
                      Reverts Info.plist on success.
   -h, --help         Show this help.
 EOF
