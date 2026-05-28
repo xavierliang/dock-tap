@@ -5,6 +5,7 @@
 /build/
 /dist/
 /.swiftpm/
+/scripts/sparkle-tools/bin/
 
 # Xcode/user-local metadata
 DerivedData/
