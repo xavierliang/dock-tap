@@ -66,3 +66,7 @@ The menu reads Launch at Login state from `SMAppService.mainApp.status`. If macO
 ## Known Limits
 
 Dock Tap reads Dock preferences on launch/menu open and does not mutate Dock contents. It does not cycle windows, remap slots, support Custom triggers, notarize releases, or install an updater.
+
+## License
+
+Dock Tap is released under the MIT License. See [LICENSE](LICENSE).
