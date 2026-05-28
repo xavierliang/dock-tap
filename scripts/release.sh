@@ -39,6 +39,158 @@ DRY_RUN=0
 log() { printf '[release] %s\n' "$*"; }
 fail() { printf '[release] ERROR: %s\n' "$*" >&2; exit 1; }
 
+parse_appcast_xml() {
+    /usr/bin/ruby -rrexml/document -e 'REXML::Document.new(File.read(ARGV.fetch(0)))' "$1" >/dev/null
+}
+
+extract_appcast_enclosure_urls() {
+    /usr/bin/ruby -rrexml/document -e '
+        doc = REXML::Document.new(File.read(ARGV.fetch(0)))
+        REXML::XPath.each(doc, "//enclosure") do |enclosure|
+            url = enclosure.attributes["url"]
+            puts url unless url.nil? || url.empty?
+        end
+    ' "$1"
+}
+
+validate_appcast_shape() {
+    local appcast="$1"
+    local enclosure_count=0
+    local url
+
+    [[ -f "$appcast" ]] || fail "appcast XML missing: $appcast"
+    parse_appcast_xml "$appcast" || fail "appcast XML is not parseable: $appcast"
+
+    if /usr/bin/grep -q '<sparkle:deltas' "$appcast"; then
+        fail "appcast contains sparkle:deltas; delta updates must not be published"
+    fi
+
+    while IFS= read -r url; do
+        [[ -n "$url" ]] || continue
+        enclosure_count=$((enclosure_count + 1))
+        if [[ "$url" == *".delta"* ]]; then
+            fail "appcast contains delta enclosure URL: $url"
+        fi
+    done < <(extract_appcast_enclosure_urls "$appcast")
+
+    [[ "$enclosure_count" -gt 0 ]] || fail "appcast contains no enclosure URLs"
+}
+
+is_2xx_status() {
+    [[ "$1" =~ ^2[0-9][0-9]$ ]]
+}
+
+http_status_for_url() {
+    local method="$1"
+    local url="$2"
+    local status
+
+    if [[ "$method" == "HEAD" ]]; then
+        status="$(curl --silent --show-error --location --head \
+            --output /dev/null --write-out '%{http_code}' --max-time 20 \
+            "$url" 2>/dev/null || true)"
+    else
+        status="$(curl --silent --show-error --location --range 0-0 \
+            --output /dev/null --write-out '%{http_code}' --max-time 20 \
+            "$url" 2>/dev/null || true)"
+    fi
+
+    printf '%s' "${status:-000}"
+}
+
+check_enclosure_url() {
+    local url="$1"
+    local attempt
+    local status
+    local last_method="HEAD"
+    local last_status="000"
+
+    for attempt in 1 2 3; do
+        status="$(http_status_for_url HEAD "$url")"
+        if is_2xx_status "$status"; then
+            printf 'HEAD %s' "$status"
+            return 0
+        fi
+        last_method="HEAD"
+        last_status="$status"
+
+        status="$(http_status_for_url GET "$url")"
+        if is_2xx_status "$status"; then
+            printf 'GET range %s' "$status"
+            return 0
+        fi
+        last_method="GET range"
+        last_status="$status"
+
+        [[ "$attempt" -eq 3 ]] || sleep 2
+    done
+
+    printf '%s %s' "$last_method" "$last_status"
+    return 1
+}
+
+print_appcast_validation_failure() {
+    local bad_url
+
+    {
+        printf '[release] ERROR: appcast enclosure URL validation failed\n'
+        printf '[release] Bad enclosure URLs:\n'
+        for bad_url in "$@"; do
+            printf '[release]   - %s\n' "$bad_url"
+        done
+        printf '[release] Manual recovery steps:\n'
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            printf '[release]   1. Inspect the generated appcast under %s.\n' "$STAGING"
+            printf '[release]   2. Confirm the historical GitHub Release DMG assets exist.\n'
+            printf '[release]   3. Re-run this dry-run after fixing missing or unreachable assets.\n'
+        else
+            printf '[release]   1. Do not commit or push docs/appcast.xml yet; this script stopped before that step.\n'
+            printf '[release]   2. Inspect GitHub Release v%s and upload or replace any missing DMG assets.\n' "$NEW_VERSION"
+            printf '[release]   3. If keeping the release, regenerate and validate docs/appcast.xml after the asset URLs return 2xx.\n'
+            printf '[release]   4. If abandoning this release, delete GitHub Release v%s, delete tag v%s, revert the pushed version bump commit, then re-run.\n' "$NEW_VERSION" "$NEW_VERSION"
+        fi
+    } >&2
+}
+
+validate_appcast_enclosure_urls() {
+    local appcast="$1"
+    local skip_url="${2:-}"
+    local url
+    local result
+    local checked_count=0
+    local skipped_count=0
+    local -a bad_urls=()
+
+    log "Validating appcast XML shape"
+    validate_appcast_shape "$appcast"
+
+    log "Validating appcast enclosure URLs"
+    while IFS= read -r url; do
+        [[ -n "$url" ]] || continue
+        if [[ -n "$skip_url" && "$url" == "$skip_url" ]]; then
+            skipped_count=$((skipped_count + 1))
+            log "DRY-RUN: skipped vNext enclosure URL: $url"
+            continue
+        fi
+
+        if result="$(check_enclosure_url "$url")"; then
+            checked_count=$((checked_count + 1))
+            log "Validated enclosure URL ($result): $url"
+        else
+            bad_urls+=("$url [$result]")
+        fi
+    done < <(extract_appcast_enclosure_urls "$appcast")
+
+    if [[ "${#bad_urls[@]}" -gt 0 ]]; then
+        print_appcast_validation_failure "${bad_urls[@]}"
+        return 1
+    fi
+
+    if [[ "$DRY_RUN" -eq 1 && "$skipped_count" -gt 0 && "$checked_count" -eq 0 ]]; then
+        fail "dry-run skipped the vNext URL but found no historical enclosure URLs to validate"
+    fi
+}
+
 usage() {
     cat <<'EOF'
 Usage: scripts/release.sh <new-version> [--notes-file PATH] [--dry-run]
@@ -86,7 +238,9 @@ done
 log "Pre-flight"
 
 command -v gh >/dev/null 2>&1 || fail "gh CLI not found"
+command -v curl >/dev/null 2>&1 || fail "curl not found"
 command -v /usr/libexec/PlistBuddy >/dev/null 2>&1 || fail "PlistBuddy not found"
+[[ -x /usr/bin/ruby ]] || fail "ruby not found at /usr/bin/ruby"
 
 if [[ -n "$(git status --porcelain)" ]]; then
     git status --short >&2
@@ -162,37 +316,30 @@ log "Packaging notarized DMG"
 DMG="$DIST_DIR/DockTap-$NEW_VERSION-arm64.dmg"
 [[ -f "$DMG" ]] || fail "expected DMG missing: $DMG"
 
-# ---- Dry-run exit -------------------------------------------------------------
-
-if [[ "$DRY_RUN" -eq 1 ]]; then
-    trap - EXIT
-    log "DRY-RUN: build + package succeeded"
-    log "Reverting Info.plist"
-    /usr/bin/git checkout -- "$INFO_PLIST"
-    log "DMG: $DMG (kept; remove manually if not needed)"
-    exit 0
-fi
-
 # ---- Commit version bump ------------------------------------------------------
 
-log "Committing version bump"
-/usr/bin/git add "$INFO_PLIST"
-/usr/bin/git commit -m "Bump version to v$NEW_VERSION"
-/usr/bin/git push origin main
-
-# ---- Create GitHub Release ----------------------------------------------------
-
-log "Creating GitHub release v$NEW_VERSION"
-NOTES_ARGS=()
-if [[ -n "$NOTES_FILE" ]]; then
-    NOTES_ARGS=(--notes-file "$NOTES_FILE")
+if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "DRY-RUN: skipping version bump commit and GitHub release creation"
 else
-    NOTES_ARGS=(--generate-notes)
+    log "Committing version bump"
+    /usr/bin/git add "$INFO_PLIST"
+    /usr/bin/git commit -m "Bump version to v$NEW_VERSION"
+    /usr/bin/git push origin main
+
+    # ---- Create GitHub Release ------------------------------------------------
+
+    log "Creating GitHub release v$NEW_VERSION"
+    NOTES_ARGS=()
+    if [[ -n "$NOTES_FILE" ]]; then
+        NOTES_ARGS=(--notes-file "$NOTES_FILE")
+    else
+        NOTES_ARGS=(--generate-notes)
+    fi
+    gh release create "v$NEW_VERSION" "$DMG" \
+        --repo "$GH_REPO" \
+        --title "v$NEW_VERSION" \
+        "${NOTES_ARGS[@]}"
 fi
-gh release create "v$NEW_VERSION" "$DMG" \
-    --repo "$GH_REPO" \
-    --title "v$NEW_VERSION" \
-    "${NOTES_ARGS[@]}"
 
 # ---- Assemble staging dir with every published DMG ---------------------------
 
@@ -222,6 +369,7 @@ done < <(gh release list --repo "$GH_REPO" --json tagName --jq '.[].tagName')
 
 log "Generating appcast.xml"
 "$SPARKLE_BIN/generate_appcast" \
+    --maximum-deltas 0 \
     --download-url-prefix "$RELEASES_BASE/v$NEW_VERSION/" \
     --link "https://github.com/$GH_REPO" \
     "$STAGING"
@@ -237,6 +385,22 @@ ESCAPED_BASE="$(printf '%s' "$RELEASES_BASE" | /usr/bin/sed -e 's|[\\/.]|\\&|g')
     "s|($ESCAPED_BASE)/v[0-9]+\\.[0-9]+\\.[0-9]+/DockTap-([0-9]+\\.[0-9]+\\.[0-9]+)-arm64\\.dmg|\\1/v\\2/DockTap-\\2-arm64.dmg|g" \
     "$GENERATED"
 rm -f "$GENERATED.bak"
+
+if [[ "$DRY_RUN" -eq 1 ]]; then
+    validate_appcast_enclosure_urls \
+        "$GENERATED" \
+        "$RELEASES_BASE/v$NEW_VERSION/DockTap-$NEW_VERSION-arm64.dmg"
+
+    trap - EXIT
+    log "DRY-RUN: build, package, appcast generation, and validation succeeded"
+    log "Reverting Info.plist"
+    /usr/bin/git checkout -- "$INFO_PLIST"
+    log "Generated appcast: $GENERATED (kept for inspection)"
+    log "DMG: $DMG (kept; remove manually if not needed)"
+    exit 0
+fi
+
+validate_appcast_enclosure_urls "$GENERATED"
 
 # ---- Commit appcast -----------------------------------------------------------
 

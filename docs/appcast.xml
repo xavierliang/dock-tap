@@ -11,9 +11,6 @@
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
             <enclosure url="https://github.com/xavierliang/dock-tap/releases/download/v0.3.0/DockTap-0.3.0-arm64.dmg" length="2640652" type="application/octet-stream" sparkle:edSignature="ezImczb7vrN+2OUJQn3uWoPqd1dBEJlUzqBc9MX6AzvJboJv80ZD8eeKHtF1ZnfN3Yy5mkDUoRpIcMccoM44Aw=="/>
-            <sparkle:deltas>
-                <enclosure url="https://github.com/xavierliang/dock-tap/releases/download/v0.3.0/DockTap3-2.delta" sparkle:deltaFrom="2" length="29490" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="IIjVawZtsPDK7nG5Aog6qiCX9AnxAm93n2i6P1QRd46j0ZJ3v6BtRNEITUTvsLfP2OezfTWsboNP+DGsw2PXDA=="/>
-            </sparkle:deltas>
         </item>
         <item>
             <title>0.2.0</title>
