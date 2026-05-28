@@ -29,6 +29,7 @@ final class ScreenCoordinateConverterTests: XCTestCase {
         let secondaryRect = CGRect(x: 100, y: -700, width: 200, height: 100)
         let axRect = axRect(fromAppKitRect: secondaryRect, displays: displays)
 
+        assertDisplayPointRoundTrips(displays: displays)
         XCTAssertEqual(axRect.origin.y, 1500, accuracy: 0.0001)
         assertRect(ScreenCoordinateConverter.axRectToAppKit(axRect, in: displays), equals: secondaryRect)
         XCTAssertEqual(ScreenCoordinateConverter.selectDisplay(for: axRect, in: displays), displays[1])
@@ -42,6 +43,7 @@ final class ScreenCoordinateConverterTests: XCTestCase {
         let secondaryRect = CGRect(x: 100, y: 1000, width: 200, height: 100)
         let axRect = axRect(fromAppKitRect: secondaryRect, displays: displays)
 
+        assertDisplayPointRoundTrips(displays: displays)
         XCTAssertEqual(axRect.origin.y, -200, accuracy: 0.0001)
         assertRect(ScreenCoordinateConverter.axRectToAppKit(axRect, in: displays), equals: secondaryRect)
         XCTAssertEqual(ScreenCoordinateConverter.selectDisplay(for: axRect, in: displays), displays[1])
@@ -55,9 +57,53 @@ final class ScreenCoordinateConverterTests: XCTestCase {
         let secondaryRect = CGRect(x: 1500, y: 100, width: 200, height: 100)
         let axRect = axRect(fromAppKitRect: secondaryRect, displays: displays)
 
+        assertDisplayPointRoundTrips(displays: displays)
         XCTAssertEqual(axRect.origin.x, 1500, accuracy: 0.0001)
         XCTAssertEqual(axRect.origin.y, 700, accuracy: 0.0001)
         assertRect(ScreenCoordinateConverter.axRectToAppKit(axRect, in: displays), equals: secondaryRect)
+        XCTAssertEqual(ScreenCoordinateConverter.selectDisplay(for: axRect, in: displays), displays[1])
+    }
+
+    func testSecondaryToTheLeftPreservesNegativeXOffset() {
+        let displays = [
+            primary(),
+            display(frame: CGRect(x: -1440, y: 0, width: 1440, height: 900))
+        ]
+        let secondaryRect = CGRect(x: -1200, y: 100, width: 200, height: 100)
+        let axRect = axRect(fromAppKitRect: secondaryRect, displays: displays)
+
+        assertDisplayPointRoundTrips(displays: displays)
+        XCTAssertEqual(axRect.origin.x, -1200, accuracy: 0.0001)
+        XCTAssertEqual(axRect.origin.y, 700, accuracy: 0.0001)
+        assertRect(ScreenCoordinateConverter.axRectToAppKit(axRect, in: displays), equals: secondaryRect)
+        XCTAssertEqual(ScreenCoordinateConverter.selectDisplay(for: axRect, in: displays), displays[1])
+    }
+
+    func testSideDisplayWithVerticalOffsetUsesAnchorForYConversion() {
+        let displays = [
+            primary(),
+            display(frame: CGRect(x: 1440, y: 250, width: 1200, height: 700))
+        ]
+        let secondaryRect = CGRect(x: 1500, y: 300, width: 200, height: 100)
+        let axRect = axRect(fromAppKitRect: secondaryRect, displays: displays)
+
+        assertDisplayPointRoundTrips(displays: displays)
+        XCTAssertEqual(axRect.origin.x, 1500, accuracy: 0.0001)
+        XCTAssertEqual(axRect.origin.y, 500, accuracy: 0.0001)
+        assertRect(ScreenCoordinateConverter.axRectToAppKit(axRect, in: displays), equals: secondaryRect)
+        XCTAssertEqual(ScreenCoordinateConverter.selectDisplay(for: axRect, in: displays), displays[1])
+    }
+
+    func testSelectedDisplayCanDifferFromCoordinateAnchor() {
+        let displays = [
+            primary(),
+            display(frame: CGRect(x: 1440, y: 250, width: 1200, height: 700))
+        ]
+        let secondaryRect = CGRect(x: 1500, y: 300, width: 200, height: 100)
+        let axRect = axRect(fromAppKitRect: secondaryRect, displays: displays)
+
+        XCTAssertTrue(displays[0].isCoordinateAnchor)
+        XCTAssertFalse(displays[1].isCoordinateAnchor)
         XCTAssertEqual(ScreenCoordinateConverter.selectDisplay(for: axRect, in: displays), displays[1])
     }
 
@@ -108,7 +154,7 @@ final class ScreenCoordinateConverterTests: XCTestCase {
         )
     }
 
-    func testSelectDisplayFallsBackToMainForOffscreenWindow() {
+    func testSelectDisplayFallsBackToCoordinateAnchorForOffscreenWindow() {
         let displays = [
             primary(),
             display(frame: CGRect(x: 1440, y: 0, width: 1440, height: 900))
@@ -121,9 +167,9 @@ final class ScreenCoordinateConverterTests: XCTestCase {
         )
     }
 
-    func testMissingMainDisplayReturnsNil() {
+    func testMissingCoordinateAnchorReturnsNil() {
         let displays = [
-            display(frame: CGRect(x: 0, y: 0, width: 1440, height: 900), isMain: false)
+            display(frame: CGRect(x: 0, y: 0, width: 1440, height: 900), isCoordinateAnchor: false)
         ]
 
         XCTAssertNil(ScreenCoordinateConverter.appKitPointToAX(CGPoint(x: 0, y: 0), in: displays))
@@ -147,6 +193,17 @@ final class ScreenCoordinateConverterTests: XCTestCase {
         }
     }
 
+    private func assertDisplayPointRoundTrips(displays: [DisplayFrame], file: StaticString = #filePath, line: UInt = #line) {
+        let points = displays.flatMap { display in
+            [
+                CGPoint(x: display.frame.minX, y: display.frame.minY),
+                CGPoint(x: display.frame.midX, y: display.frame.midY),
+                CGPoint(x: display.frame.maxX, y: display.frame.maxY)
+            ]
+        }
+        assertRoundTrips(points: points, displays: displays, file: file, line: line)
+    }
+
     private func axRect(fromAppKitRect rect: CGRect, displays: [DisplayFrame]) -> CGRect {
         guard let origin = ScreenCoordinateConverter.appKitPointToAX(CGPoint(x: rect.minX, y: rect.maxY), in: displays) else {
             XCTFail("expected AppKit-to-AX conversion")
@@ -156,18 +213,18 @@ final class ScreenCoordinateConverterTests: XCTestCase {
     }
 
     private func primary(scaleFactor: CGFloat? = nil) -> DisplayFrame {
-        display(frame: CGRect(x: 0, y: 0, width: 1440, height: 900), isMain: true, scaleFactor: scaleFactor)
+        display(frame: CGRect(x: 0, y: 0, width: 1440, height: 900), isCoordinateAnchor: true, scaleFactor: scaleFactor)
     }
 
     private func display(
         frame: CGRect,
-        isMain: Bool = false,
+        isCoordinateAnchor: Bool = false,
         scaleFactor: CGFloat? = nil
     ) -> DisplayFrame {
         DisplayFrame(
             frame: frame,
             visibleFrame: frame.insetBy(dx: 0, dy: 20),
-            isMain: isMain,
+            isCoordinateAnchor: isCoordinateAnchor,
             scaleFactor: scaleFactor
         )
     }

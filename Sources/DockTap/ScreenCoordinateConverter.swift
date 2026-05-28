@@ -2,32 +2,32 @@ import CoreGraphics
 
 enum ScreenCoordinateConverter {
     static func axRectToAppKit(_ axRect: CGRect, in displays: [DisplayFrame]) -> CGRect? {
-        guard let mainTopY = mainTopY(in: displays) else {
+        guard let anchorTopY = anchorTopY(in: displays) else {
             return nil
         }
 
         return CGRect(
             x: axRect.minX,
-            y: mainTopY - axRect.minY - axRect.height,
+            y: anchorTopY - axRect.minY - axRect.height,
             width: axRect.width,
             height: axRect.height
         )
     }
 
     static func appKitPointToAX(_ point: CGPoint, in displays: [DisplayFrame]) -> CGPoint? {
-        guard let mainTopY = mainTopY(in: displays) else {
+        guard let anchorTopY = anchorTopY(in: displays) else {
             return nil
         }
 
-        return CGPoint(x: point.x, y: mainTopY - point.y)
+        return CGPoint(x: point.x, y: anchorTopY - point.y)
     }
 
     static func axPointToAppKit(_ point: CGPoint, in displays: [DisplayFrame]) -> CGPoint? {
-        guard let mainTopY = mainTopY(in: displays) else {
+        guard let anchorTopY = anchorTopY(in: displays) else {
             return nil
         }
 
-        return CGPoint(x: point.x, y: mainTopY - point.y)
+        return CGPoint(x: point.x, y: anchorTopY - point.y)
     }
 
     static func selectDisplay(for axRect: CGRect, in displays: [DisplayFrame]) -> DisplayFrame? {
@@ -50,15 +50,15 @@ enum ScreenCoordinateConverter {
             return containingDisplay
         }
 
-        return displays.first(where: \.isMain)
+        return displays.first(where: \.isCoordinateAnchor)
     }
 
-    private static func mainTopY(in displays: [DisplayFrame]) -> CGFloat? {
-        guard let mainDisplay = displays.first(where: \.isMain) else {
+    private static func anchorTopY(in displays: [DisplayFrame]) -> CGFloat? {
+        guard let coordinateAnchor = displays.first(where: \.isCoordinateAnchor) else {
             return nil
         }
 
-        return mainDisplay.frame.maxY
+        return coordinateAnchor.frame.maxY
     }
 
     private static func intersectionArea(_ lhs: CGRect, _ rhs: CGRect) -> CGFloat {

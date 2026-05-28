@@ -104,22 +104,22 @@ New:
 - `Sources/DockTap/DisplayFrame.swift` — pure value type. Fields:
   - `frame: CGRect` — display frame in AppKit coordinates.
   - `visibleFrame: CGRect` — visible (menu-bar / Dock excluded) frame in AppKit coordinates.
-  - `isMain: Bool` — whether this display is the primary; exactly one entry in any valid `[DisplayFrame]` has `isMain == true` (or zero entries if the caller had no main display).
+  - `isCoordinateAnchor: Bool` — whether this display is the AX coordinate anchor (the AppKit-origin / menu-bar display), not the keyboard-focus screen; exactly one entry in any valid `[DisplayFrame]` has `isCoordinateAnchor == true` whenever displays are available.
   - `identifier: String` (optional, log/test-readability only).
   - `scaleFactor: CGFloat` (optional, log/test-readability only — **must not** participate in any coordinate math; the converter does not scale).
 - `Sources/DockTap/ScreenCoordinateConverter.swift` — pure helper. Operates entirely on `DisplayFrame` values and `CGRect` / `CGPoint`; **never references `NSScreen`**. Public API:
   - AX rect → AppKit rect, AppKit point → AX point, AX point → AppKit point (sizes never converted — `width` and `height` are coordinate-system invariant).
-  - `selectDisplay(for axRect: CGRect, in displays: [DisplayFrame]) -> DisplayFrame?` — convert `axRect` to AppKit internally, then pick the display with maximum frame intersection; on a tie or zero intersection, pick the display containing the converted rect's center; if still none, fall back to the display in `displays` with `isMain == true`; if no display has `isMain == true`, return `nil` (caller decides what to do — `WindowActor` will log and no-op).
-  - The "primary display top-left = (0, 0)" anchor that the AX↔AppKit translation relies on is computed from the `isMain == true` entry's `frame` and `frame.height`. If no main exists, AX↔AppKit conversions return `nil`/throw a logged failure (`WindowActor` log + no-op).
-- `Sources/DockTap/WindowActor.swift` — AX side, sibling of `AppActivator`. **This is the only file in M4 that may read `NSScreen.screens`, `NSScreen.main`, `NSScreen.frame`, `NSScreen.visibleFrame`, or `NSScreen.backingScaleFactor`.** It maps `NSScreen.screens` to `[DisplayFrame]` (each entry's `isMain` is set by `screen == NSScreen.main`), passes the resulting array to `ScreenCoordinateConverter`, and never calls `NSScreen.frame.contains` on a raw AX point.
+  - `selectDisplay(for axRect: CGRect, in displays: [DisplayFrame]) -> DisplayFrame?` — convert `axRect` to AppKit internally, then pick the display with maximum frame intersection; on a tie or zero intersection, pick the display containing the converted rect's center; if still none, fall back to the display in `displays` with `isCoordinateAnchor == true`; if no display has `isCoordinateAnchor == true`, return `nil` (caller decides what to do — `WindowActor` will log and no-op).
+  - The "primary display top-left = (0, 0)" anchor that the AX↔AppKit translation relies on is computed from the `isCoordinateAnchor == true` entry's `frame` and `frame.height`. If no coordinate anchor exists, AX↔AppKit conversions return `nil`/throw a logged failure (`WindowActor` log + no-op).
+- `Sources/DockTap/WindowActor.swift` — AX side, sibling of `AppActivator`. **This is the only file in M4 that may read `NSScreen.screens`, `NSScreen.frame`, `NSScreen.visibleFrame`, or `NSScreen.backingScaleFactor`; it must not use `NSScreen.main` as the coordinate anchor.** It maps `NSScreen.screens` to `[DisplayFrame]`, marking the screen whose `frame.origin == .zero` as `isCoordinateAnchor`; if no origin-zero screen is found, it falls back to `NSScreen.screens.first` and logs a warning. It passes the resulting array to `ScreenCoordinateConverter`, and never calls `NSScreen.frame.contains` on a raw AX point.
 - `Sources/DockTap/AccessibilityWindow.swift` (small AX wrapper) — thin shim over `AXUIElement` for `frontmostApplicationElement`, `focusedWindow`, `frame` (returned in AX coordinates), `setFrame(_:adjustSizeFirst:)` (accepts AX coordinates). Keep it minimal; do not mirror Rectangle's full surface area. If `WindowActor` is short enough to inline the AX dance, this file can be skipped — Lead call during code review.
 - `Tests/DockTapTests/WindowActionTests.swift` — pure tests for `targetRect(in:)` (AppKit-coordinate math only) and the action name strings.
 <!-- 修订v2: lead 拍板（应 Reviewer C-3）——独立 ScreenCoordinateConverterTests，理由 坐标换算回归不能藏在 WindowActionTests 里 -->
-<!-- 修订v3: lead 拍板（应 Reviewer B-1）——tests 只构造 DisplayFrame 值，禁止构造 NSScreen；fallback 走 isMain，不再提 NSScreen.main -->
-- `Tests/DockTapTests/ScreenCoordinateConverterTests.swift` — **constructs only `DisplayFrame` values; never instantiates `NSScreen`.** Fixtures: (a) single primary `DisplayFrame` at AppKit origin `(0,0)` with `isMain: true`; (b) primary + secondary **below** primary in AppKit (`secondary.frame.origin.y < 0`); (c) primary + secondary **above** primary (`secondary.frame.origin.y > primary.frame.height`); (d) primary + secondary **to the right** of primary at non-zero X; (e) primary + secondary with a different `scaleFactor` value — assert the converter outputs are identical to fixture (a)/(d) sizes (scaleFactor is metadata only, must not participate in math). For each, assert AX→AppKit and AppKit→AX round-trip identity on representative points, and assert `selectDisplay(for:in:)` returns the correct `DisplayFrame` for a window that straddles the boundary (max-intersection wins). Additional cases:
+<!-- 修订v3: lead 拍板（应 Reviewer B-1）——tests 只构造 DisplayFrame 值，禁止构造 NSScreen；fallback 走 isCoordinateAnchor，不再提 NSScreen.main -->
+- `Tests/DockTapTests/ScreenCoordinateConverterTests.swift` — **constructs only `DisplayFrame` values; never instantiates `NSScreen`.** Fixtures: (a) single primary `DisplayFrame` at AppKit origin `(0,0)` with `isCoordinateAnchor: true`; (b) primary + secondary **below** primary in AppKit (`secondary.frame.origin.y < 0`); (c) primary + secondary **above** primary (`secondary.frame.origin.y > primary.frame.height`); (d) primary + secondary **to the right** of primary at non-zero X; (e) secondary **left** of the anchor with negative X; (f) side display with a vertical offset; (g) primary + secondary with a different `scaleFactor` value — assert the converter outputs are identical to fixture (a)/(d) sizes (scaleFactor is metadata only, must not participate in math). For each, assert AX→AppKit and AppKit→AX round-trip identity on representative points, and assert `selectDisplay(for:in:)` returns the correct `DisplayFrame` for a window that straddles the boundary (max-intersection wins), including a selected display that is not the coordinate anchor. Additional cases:
   - Straddle tie or zero intersection → falls back to the `DisplayFrame` containing the converted rect's center.
-  - Window fully off-screen → falls back to the `isMain: true` entry.
-  - `[DisplayFrame]` with **no** `isMain: true` entry → `selectDisplay` returns `nil`; AX↔AppKit conversion APIs also surface the missing-main case as `nil` / logged failure.
+  - Window fully off-screen → falls back to the `isCoordinateAnchor: true` entry.
+  - `[DisplayFrame]` with **no** `isCoordinateAnchor: true` entry → `selectDisplay` returns `nil`; AX↔AppKit conversion APIs also surface the missing-anchor case as `nil` / logged failure.
   - Empty `[DisplayFrame]` → `selectDisplay` returns `nil`.
 - `Tests/DockTapTests/RuleMatcherWindowActionTests.swift` — branch tests, especially the off-by-default behavior.
 - `Tests/DockTapTests/MenuContentModelWindowSnapTests.swift` — or extend existing `MenuContentModelTests.swift` with a focused fixture.
@@ -192,22 +192,25 @@ Per-call sequence:
 2. `NSWorkspace.shared.frontmostApplication` → if `nil`, log `action failed windowAction=<rawValue> no frontmost app` and return.
 3. Build `AXUIElementCreateApplication(pid)` for that app's `processIdentifier`.
 4. `AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute, &value)` → if not `.success` or value is nil, log `action failed windowAction=<rawValue> no focused window axError=<code>` and return.
-5. Read the window's current AX position and size (`kAXPositionAttribute`, `kAXSizeAttribute`). Build an AX-coordinate `CGRect` from them.
-<!-- 修订v3: lead 拍板（应 Reviewer B-1）——WindowActor 把 NSScreen.screens 映射成 [DisplayFrame] 后传给 converter；converter 决不见 NSScreen；fallback 走 isMain，不在 converter 内提 NSScreen.main -->
-6. **Map `NSScreen.screens` to `[DisplayFrame]`**, marking the entry equal to `NSScreen.main` as `isMain: true`. This mapping is the *only* place in M4 that reads `NSScreen` — `DisplayFrame` is a pure value type and is the only display-geometry type that crosses into `ScreenCoordinateConverter` and from there into tests.
-7. **Convert the AX-coordinate rect to an AppKit-coordinate rect** via `ScreenCoordinateConverter`, passing in the `[DisplayFrame]` from step 6.
-8. **Pick the target display** with `ScreenCoordinateConverter.selectDisplay(for: <converted AppKit rect>, in: <displays>)`. The converter's policy is: maximum frame intersection → containing-center on tie/zero → `isMain: true` fallback → `nil`. If the converter returns `nil`, `WindowActor` logs `action failed windowAction=<rawValue> no selectable display` and returns. The window stays on its current display — pick-display is "where is this window now," not "where should it go."
-9. Compute the target rect in AppKit coordinates: `let targetAppKit = action.targetRect(in: chosenDisplay.visibleFrame)`. `targetRect` is pure AppKit math and knows nothing about AX or `DisplayFrame`.
-10. **Convert the target rect's origin back to AX coordinates** via `ScreenCoordinateConverter` (size stays unchanged). The result is an AX-coordinate `CGPoint` + an unchanged `CGSize`. If the converter cannot translate (e.g. the `[DisplayFrame]` had no `isMain: true` entry — a degenerate runtime state), log and return.
-11. Write order — size first, then position. This matches Rectangle's `adjustSizeFirst` pattern and is the safe default for the six v1 actions (all stay on the current display).
-12. `AXUIElementSetAttributeValue(window, kAXSizeAttribute, AXValueCreate(.cgSize, &size))`; check return code.
-13. `AXUIElementSetAttributeValue(window, kAXPositionAttribute, AXValueCreate(.cgPoint, &positionAX))`; check return code.
-14. Log `action applied windowAction=<rawValue> rectAppKit=<x,y,w,h> originAX=<x,y> axSizeResult=<code> axPositionResult=<code>`. Logging both rect spaces makes coordinate-bug forensics trivial.
+5. Read `AXFullScreen`; if true, log `action skipped windowAction=<rawValue> fullscreen` and return.
+6. Read `kAXMinimizedAttribute` / `AXMinimized`; if true, log `action skipped windowAction=<rawValue> minimized` and return before any AX size/position write.
+7. Read the window's current AX position and size (`kAXPositionAttribute`, `kAXSizeAttribute`). Build an AX-coordinate `CGRect` from them.
+<!-- 修订v3: lead 拍板（应 Reviewer B-1）——WindowActor 把 NSScreen.screens 映射成 [DisplayFrame] 后传给 converter；converter 决不见 NSScreen；fallback 走 isCoordinateAnchor，不在 converter 内提 NSScreen.main -->
+8. **Map `NSScreen.screens` to `[DisplayFrame]`**, marking the screen whose `frame.origin == .zero` as `isCoordinateAnchor: true`; if none is found, fall back to `NSScreen.screens.first` and log a warning. This mapping is the *only* place in M4 that reads `NSScreen` geometry — `DisplayFrame` is a pure value type and is the only display-geometry type that crosses into `ScreenCoordinateConverter` and from there into tests.
+9. **Convert the AX-coordinate rect to an AppKit-coordinate rect** via `ScreenCoordinateConverter`, passing in the `[DisplayFrame]` from step 8.
+10. **Pick the target display** with `ScreenCoordinateConverter.selectDisplay(for: <current AX rect>, in: <displays>)`. The converter accepts the AX rect and converts it to AppKit internally. Its policy is: maximum frame intersection → containing-center on tie/zero → `isCoordinateAnchor: true` fallback → `nil`. If the converter returns `nil`, `WindowActor` logs `action failed windowAction=<rawValue> no selectable display` and returns. The window stays on its current display — pick-display is "where is this window now," not "where should it go."
+11. Compute the target rect in AppKit coordinates: `let targetAppKit = action.targetRect(in: chosenDisplay.visibleFrame)`. `targetRect` is pure AppKit math and knows nothing about AX or `DisplayFrame`.
+12. **Convert the target rect's origin back to AX coordinates** via `ScreenCoordinateConverter` (size stays unchanged). The result is an AX-coordinate `CGPoint` + an unchanged `CGSize`. If the converter cannot translate (e.g. the `[DisplayFrame]` had no `isCoordinateAnchor: true` entry — a degenerate runtime state), log and return.
+13. Write order — size first, then position. This matches Rectangle's `adjustSizeFirst` pattern and is the safe default for the six v1 actions (all stay on the current display).
+14. `AXUIElementSetAttributeValue(window, kAXSizeAttribute, AXValueCreate(.cgSize, &size))`; check return code.
+15. `AXUIElementSetAttributeValue(window, kAXPositionAttribute, AXValueCreate(.cgPoint, &positionAX))`; check return code.
+16. Log `action applied windowAction=<rawValue> ... currentAppKit=<x,y,w,h> display=<chosen> rectAppKit=<x,y,w,h> originAX=<x,y> axSizeResult=<code> axPositionResult=<code>` when both AX writes succeed; log `action partial ...` when exactly one write succeeds; log `action failed ...` when both writes fail. Logging both rect spaces and the chosen display makes coordinate-bug forensics direct.
 
 Failure modes and how `WindowActor` handles each:
 - **No frontmost app** (rare; happens momentarily during app launch/quit): log + no-op. No alert, no error sound.
 - **Frontmost app has no focused window** (Finder with no window, browser with all windows closed): log + no-op.
 - **Window is fullscreen** (`kAXFullscreenAttribute` is true): AX writes will typically fail or be silently ignored. Read `kAXFullscreenAttribute` *before* writing; if true, log `action skipped windowAction=<rawValue> fullscreen` and return. Do not try to exit fullscreen.
+- **Window is minimized** (`kAXMinimizedAttribute` / `AXMinimized` is true): log `action skipped windowAction=<rawValue> minimized` and return before any AX size/position write. Do not try to un-minimize.
 - **Window is non-resizable** (`kAXResizableAttribute` false, or sentinel windows like dialogs): writes will partially succeed. Do not pre-check; let AX return its error code and log it. Users can see the no-op in logs.
 - **App rejects AX writes** (Electron with custom frame, some Java apps): AX returns success but window does not move, or returns `.cannotComplete`. Log the AX code. Document in README: known incompatibilities exist; this is inherent to the AX API, not a Dock Tap bug.
 - **AX call blocks** (target app is hung): the main queue may stall briefly. Document as a known risk in §Risks; mitigation deferred to a future plan if it becomes a real problem.
@@ -218,7 +221,7 @@ The actor must **not**:
 - Activate the app it is snapping (no `NSRunningApplication.activate` here — snapping is intentional, activating is the user's `AppActivator` job).
 - Iterate or enumerate windows beyond the focused one.
 - Walk Spaces or move windows across Spaces.
-- Read or write any AX attribute other than the four named above (`kAXFocusedWindow`, `kAXPosition`, `kAXSize`, `kAXFullscreen`).
+- Read or write any AX attribute other than the named surface above (`kAXFocusedWindow`, `kAXPosition`, `kAXSize`, `kAXFullscreen` / `AXFullScreen`, `kAXMinimizedAttribute` / `AXMinimized`).
 
 ## Testing plan
 
@@ -235,9 +238,11 @@ Pure unit tests (XCTest, no AX):
   - Fixture B — primary `(0,0)–(1440,900)` + secondary **below** primary `(0,-900)–(1440,0)` in AppKit (which is AX rows 900–1800): a window centered on the secondary screen converts to AX Y in the 900–1800 band, not 0–900.
   - Fixture C — primary + secondary **above** primary at AppKit `(0,900)–(1440,1800)`: AX Y must be negative for the secondary, since AX origin sits at the primary top-left.
   - Fixture D — primary + secondary **to the right** of primary at AppKit `(1440,0)–(2880,900)`: pure X offset, Y unchanged.
-  - Fixture E — primary + secondary with a different scale factor (e.g. 2× retina + 1× external): assert size is **not** scaled by the converter (sizes are coordinate-system invariant); only origin is translated.
-<!-- 修订v4: lead 拍板（应 Reviewer B-1 残留）——screen-pick 描述只走 DisplayFrame.isMain，禁止再出现 NSScreen.main / fixture supplies / main = nil -->
-  - Screen-pick function (`selectDisplay(for:in:)`, all inputs are `DisplayFrame` values — no `NSScreen` ever constructed): a window straddling two displays picks the `DisplayFrame` with maximum frame intersection; a window fully on one display picks that `DisplayFrame`; a window outside any display falls back to the `DisplayFrame` whose `isMain == true`; a `[DisplayFrame]` with **no** entry where `isMain == true` (or an empty array) returns `nil`, and the caller (`WindowActor`) logs and no-ops.
+  - Fixture E — primary + secondary **to the left** of primary at AppKit `(-1440,0)–(0,900)`: X stays negative through conversion.
+  - Fixture F — primary + side display with a vertical offset: Y conversion still uses the coordinate anchor, while `selectDisplay` returns the side display.
+  - Fixture G — primary + secondary with a different scale factor (e.g. 2× retina + 1× external): assert size is **not** scaled by the converter (sizes are coordinate-system invariant); only origin is translated.
+<!-- 修订v4: lead 拍板（应 Reviewer B-1 残留）——screen-pick 描述只走 DisplayFrame.isCoordinateAnchor，禁止再出现 NSScreen.main / fixture supplies / main = nil -->
+  - Screen-pick function (`selectDisplay(for:in:)`, all inputs are `DisplayFrame` values — no `NSScreen` ever constructed): a window straddling two displays picks the `DisplayFrame` with maximum frame intersection; a window fully on one display picks that `DisplayFrame`; a window outside any display falls back to the `DisplayFrame` whose `isCoordinateAnchor == true`; a `[DisplayFrame]` with **no** entry where `isCoordinateAnchor == true` (or an empty array) returns `nil`, and the caller (`WindowActor`) logs and no-ops.
 - **`RuleMatcherWindowActionTests`**
   - Arrow / Return / Space key under the matching trigger preset with `windowActionsEnabled: true` → returns `.windowAction(...)` with the expected `WindowAction`.
   - Same keys with `windowActionsEnabled: false` → returns `nil` (event passes through; no consumption).
@@ -278,7 +283,7 @@ Toggle-off baseline (regression guard for existing users):
 Toggle-on basic checks:
 - Flip `Window Snap` on from the menu. The menu rebuilds; the submenu shows six rows; the toggle row is checked.
 - Focus a resizable app (Safari, Notes, TextEdit). `<preset>+←` snaps it to the left half of the current screen. `<preset>+→` to the right half. `<preset>+↑` top half. `<preset>+↓` bottom half. `<preset>+Return` maximize. `<preset>+Space` center.
-- Logs show one `action start` and one `action applied` line per shortcut with the expected `rect=` payload.
+- Logs show one `action start` and one result line per shortcut: `action applied` when both AX writes succeed, `action partial` when one succeeds, and `action failed` when both fail. The payload includes `currentAppKit`, chosen display, `rectAppKit`, `originAX`, and both AX result codes.
 - Window stays on its current display; it does not jump to the main display.
 - Snapping a window twice in a row with the same shortcut yields the same final rect (no cycling).
 

@@ -1,8 +1,61 @@
 import AppKit
 import ApplicationServices
 
+struct WindowScreenSnapshot: Equatable {
+    let frame: CGRect
+    let visibleFrame: CGRect
+    let name: String?
+    let scaleFactor: CGFloat?
+
+    init(
+        frame: CGRect,
+        visibleFrame: CGRect,
+        name: String? = nil,
+        scaleFactor: CGFloat? = nil
+    ) {
+        self.frame = frame
+        self.visibleFrame = visibleFrame
+        self.name = name
+        self.scaleFactor = scaleFactor
+    }
+
+    init(screen: NSScreen) {
+        self.init(
+            frame: screen.frame,
+            visibleFrame: screen.visibleFrame,
+            name: screen.localizedName,
+            scaleFactor: screen.backingScaleFactor
+        )
+    }
+}
+
+enum DisplayFrameMapper {
+    static func displayFrames(from snapshots: [WindowScreenSnapshot]) -> [DisplayFrame] {
+        let coordinateAnchorIndex = coordinateAnchorIndex(in: snapshots)
+
+        return snapshots.enumerated().map { index, snapshot in
+            DisplayFrame(
+                frame: snapshot.frame,
+                visibleFrame: snapshot.visibleFrame,
+                isCoordinateAnchor: index == coordinateAnchorIndex,
+                identifier: snapshot.name,
+                scaleFactor: snapshot.scaleFactor
+            )
+        }
+    }
+
+    static func usesFallbackAnchor(in snapshots: [WindowScreenSnapshot]) -> Bool {
+        !snapshots.isEmpty && snapshots.firstIndex { $0.frame.origin == .zero } == nil
+    }
+
+    private static func coordinateAnchorIndex(in snapshots: [WindowScreenSnapshot]) -> Int? {
+        snapshots.firstIndex { $0.frame.origin == .zero } ?? snapshots.indices.first
+    }
+}
+
 final class WindowActor {
     private static let fullScreenAttribute = "AXFullScreen"
+    private static let minimizedAttribute = kAXMinimizedAttribute
 
     private let logStore: LogStore
 
@@ -42,6 +95,11 @@ final class WindowActor {
             return
         }
 
+        if readBoolAttribute(Self.minimizedAttribute, from: window).value == true {
+            logStore.append("action skipped windowAction=\(action.rawValue) minimized")
+            return
+        }
+
         let positionResult = readPointAttribute(kAXPositionAttribute, from: window)
         guard positionResult.error == .success, let positionAX = positionResult.point else {
             logStore.append(
@@ -75,22 +133,21 @@ final class WindowActor {
 
         let axSizeResult = setSize(targetAppKitRect.size, on: window)
         let axPositionResult = setPosition(targetAXOrigin, on: window)
+        let resultVerb = resultVerb(sizeResult: axSizeResult, positionResult: axPositionResult)
         logStore.append(
-            "action applied windowAction=\(action.rawValue) currentAppKit=\(format(currentAppKitRect)) rectAppKit=\(format(targetAppKitRect)) originAX=\(format(targetAXOrigin)) axSizeResult=\(axSizeResult.rawValue) axPositionResult=\(axPositionResult.rawValue)"
+            "\(resultVerb) windowAction=\(action.rawValue) currentAppKit=\(format(currentAppKitRect)) display=\(format(display)) rectAppKit=\(format(targetAppKitRect)) originAX=\(format(targetAXOrigin)) axSizeResult=\(axSizeResult.rawValue) axPositionResult=\(axPositionResult.rawValue)"
         )
     }
 
     private func displayFrames() -> [DisplayFrame] {
-        let mainScreen = NSScreen.main
-        return NSScreen.screens.map { screen in
-            DisplayFrame(
-                frame: screen.frame,
-                visibleFrame: screen.visibleFrame,
-                isMain: screen == mainScreen,
-                identifier: screen.localizedName,
-                scaleFactor: screen.backingScaleFactor
+        let snapshots = NSScreen.screens.map(WindowScreenSnapshot.init(screen:))
+        if DisplayFrameMapper.usesFallbackAnchor(in: snapshots), let coordinateAnchorSnapshot = snapshots.first {
+            logStore.append(
+                "display warning coordinateAnchor=fallback display=\(coordinateAnchorSnapshot.name ?? "unknown") frame=\(format(coordinateAnchorSnapshot.frame))"
             )
         }
+
+        return DisplayFrameMapper.displayFrames(from: snapshots)
     }
 
     private func focusedWindow(in appElement: AXUIElement) -> (window: AXUIElement?, error: AXError) {
@@ -190,6 +247,21 @@ final class WindowActor {
         } else {
             DispatchQueue.main.async(execute: work)
         }
+    }
+
+    private func resultVerb(sizeResult: AXError, positionResult: AXError) -> String {
+        switch (sizeResult == .success, positionResult == .success) {
+        case (true, true):
+            "action applied"
+        case (true, false), (false, true):
+            "action partial"
+        case (false, false):
+            "action failed"
+        }
+    }
+
+    private func format(_ display: DisplayFrame) -> String {
+        "{id=\(display.identifier ?? "unknown"),frame=\(format(display.frame)),visibleFrame=\(format(display.visibleFrame)),coordinateAnchor=\(display.isCoordinateAnchor)}"
     }
 
     private func format(_ rect: CGRect) -> String {

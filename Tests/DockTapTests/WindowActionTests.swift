@@ -36,6 +36,19 @@ final class WindowActionTests: XCTestCase {
         XCTAssertEqual(rect.midY, visibleFrame.midY, accuracy: 0.0001)
     }
 
+    func testHalfRectsPreserveOddWidthBoundaries() {
+        let visibleFrame = CGRect(x: 10, y: 20, width: 1441, height: 901)
+        let leftRect = WindowAction.leftHalf.targetRect(in: visibleFrame)
+        let rightRect = WindowAction.rightHalf.targetRect(in: visibleFrame)
+
+        XCTAssertEqual(leftRect.width, 720.5, accuracy: 0.0001)
+        XCTAssertEqual(rightRect.width, 720.5, accuracy: 0.0001)
+        XCTAssertEqual(leftRect.minX, visibleFrame.minX, accuracy: 0.0001)
+        XCTAssertEqual(leftRect.maxX, visibleFrame.midX, accuracy: 0.0001)
+        XCTAssertEqual(rightRect.minX, visibleFrame.midX, accuracy: 0.0001)
+        XCTAssertEqual(rightRect.maxX, visibleFrame.maxX, accuracy: 0.0001)
+    }
+
     func testDisplayNamesAndShortcutKeyLabels() {
         XCTAssertEqual(WindowAction.allCases.map(\.displayName), [
             "Left Half",

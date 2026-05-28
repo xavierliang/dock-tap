@@ -4,30 +4,42 @@ import XCTest
 final class RuleMatcherWindowActionTests: XCTestCase {
     private let decider = KeyEventDecider()
 
-    func testWindowActionKeysMatchWhenEnabled() {
-        let expectations: [(UInt16, WindowAction, String)] = [
-            (KeyCodes.leftArrow, .leftHalf, "Left Option+←"),
-            (KeyCodes.rightArrow, .rightHalf, "Left Option+→"),
-            (KeyCodes.upArrow, .topHalf, "Left Option+↑"),
-            (KeyCodes.downArrow, .bottomHalf, "Left Option+↓"),
-            (KeyCodes.returnKey, .maximize, "Left Option+Return"),
-            (KeyCodes.space, .center, "Left Option+Space")
-        ]
+    func testWindowActionKeysMatchWhenEnabledForAllTriggerPresets() {
+        for preset in TriggerModifierPreset.allCases {
+            for (keyCode, action) in windowActionExpectations {
+                let decision = decide(
+                    keyCode: keyCode,
+                    triggerModifier: preset,
+                    windowActionsEnabled: true
+                )
 
-        for (keyCode, action, shortcutLabel) in expectations {
-            let decision = decide(keyCode: keyCode, windowActionsEnabled: true)
-
-            XCTAssertTrue(decision.consumesEvent, "\(KeyCodes.label(for: keyCode)) should be consumed")
-            XCTAssertEqual(decision.intent, .windowAction(action, shortcutLabel: shortcutLabel))
+                XCTAssertTrue(
+                    decision.consumesEvent,
+                    "\(preset.rawValue) \(KeyCodes.label(for: keyCode)) should be consumed"
+                )
+                XCTAssertEqual(
+                    decision.intent,
+                    .windowAction(action, shortcutLabel: preset.shortcutLabel(forKeyLabel: action.shortcutKeyLabel))
+                )
+            }
         }
     }
 
-    func testWindowActionKeysPassThroughWhenDisabled() {
-        for keyCode in [KeyCodes.leftArrow, KeyCodes.rightArrow, KeyCodes.upArrow, KeyCodes.downArrow, KeyCodes.returnKey, KeyCodes.space] {
-            let decision = decide(keyCode: keyCode, windowActionsEnabled: false)
+    func testWindowActionKeysPassThroughWhenDisabledForAllTriggerPresets() {
+        for preset in TriggerModifierPreset.allCases {
+            for (keyCode, _) in windowActionExpectations {
+                let decision = decide(
+                    keyCode: keyCode,
+                    triggerModifier: preset,
+                    windowActionsEnabled: false
+                )
 
-            XCTAssertFalse(decision.consumesEvent, "\(KeyCodes.label(for: keyCode)) should pass through")
-            XCTAssertNil(decision.intent)
+                XCTAssertFalse(
+                    decision.consumesEvent,
+                    "\(preset.rawValue) \(KeyCodes.label(for: keyCode)) should pass through"
+                )
+                XCTAssertNil(decision.intent)
+            }
         }
     }
 
@@ -65,6 +77,7 @@ final class RuleMatcherWindowActionTests: XCTestCase {
 
     private func decide(
         keyCode: UInt16,
+        triggerModifier: TriggerModifierPreset = .leftOption,
         modifiers: ModifierSnapshot? = nil,
         slots: DockSlotSnapshot = .empty,
         windowActionsEnabled: Bool
@@ -72,11 +85,22 @@ final class RuleMatcherWindowActionTests: XCTestCase {
         decider.decide(
             kind: .keyDown,
             keyCode: keyCode,
-            modifiers: modifiers ?? self.modifiers(with: [KeyCodes.leftOption]),
-            triggerModifier: .leftOption,
+            modifiers: modifiers ?? self.modifiers(with: [triggerModifier.physicalKeyCode]),
+            triggerModifier: triggerModifier,
             slots: slots,
             windowActionsEnabled: windowActionsEnabled
         )
+    }
+
+    private var windowActionExpectations: [(UInt16, WindowAction)] {
+        [
+            (KeyCodes.leftArrow, .leftHalf),
+            (KeyCodes.rightArrow, .rightHalf),
+            (KeyCodes.upArrow, .topHalf),
+            (KeyCodes.downArrow, .bottomHalf),
+            (KeyCodes.returnKey, .maximize),
+            (KeyCodes.space, .center)
+        ]
     }
 
     private func modifiers(with keyCodes: [UInt16]) -> ModifierSnapshot {
