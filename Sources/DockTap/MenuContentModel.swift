@@ -1,8 +1,4 @@
 struct MenuContentModel: Equatable {
-    struct ExampleRow: Equatable {
-        let title: String
-    }
-
     struct MappingRow: Equatable {
         let shortcutIndex: Int
         let title: String
@@ -21,8 +17,8 @@ struct MenuContentModel: Equatable {
     }
 
     let summaryTitle: String
-    let exampleRows: [ExampleRow]
-    let showDockMappingTitle: String
+    let dockShortcutsTitle: String
+    let finderShortcutTitle: String
     let mappingRows: [MappingRow]
     let triggerModifierTitle: String
     let triggerRows: [TriggerRow]
@@ -36,7 +32,7 @@ struct MenuContentModel: Equatable {
     let openAccessibilitySettingsTitle: String?
     let updateAvailableTitle: String?
     let checkForUpdatesTitle: String
-    let aboutTitle: String
+    let versionTitle: String
     let quitTitle: String
     let assignedShortcutCount: Int
 
@@ -58,10 +54,10 @@ struct MenuContentModel: Equatable {
             statusTitle,
             selectedPreset.menuTitle,
             AppText.DockShortcuts.countTitle(assignedCount)
-        ].joined(separator: " | ")
+        ].joined(separator: " · ")
         assignedShortcutCount = assignedCount
-        exampleRows = Self.exampleRows(selectedPreset: selectedPreset)
-        showDockMappingTitle = AppText.Menu.showDockMapping
+        dockShortcutsTitle = AppText.Menu.dockShortcuts
+        finderShortcutTitle = Self.finderShortcutTitle(selectedPreset: selectedPreset)
         mappingRows = (0..<10).map { shortcutIndex in
             Self.mappingRow(
                 shortcutIndex: shortcutIndex,
@@ -87,7 +83,7 @@ struct MenuContentModel: Equatable {
         openAccessibilitySettingsTitle = isAccessibilityTrusted ? nil : AppText.Menu.openAccessibilitySettings
         updateAvailableTitle = availableUpdateVersion.map { AppText.Menu.updateAvailable(version: $0) }
         checkForUpdatesTitle = AppText.Menu.checkForUpdates
-        aboutTitle = AppText.Menu.about(appName: appName, version: appVersion)
+        versionTitle = AppText.Menu.versionTitle(version: appVersion)
         quitTitle = AppText.Menu.quit
     }
 
@@ -98,10 +94,8 @@ struct MenuContentModel: Equatable {
         return AppText.Status.ready
     }
 
-    private static func exampleRows(selectedPreset: TriggerModifierPreset) -> [ExampleRow] {
-        [
-            ExampleRow(title: "\(selectedPreset.shortcutLabel(forKeyLabel: "`"))  \(AppText.DockShortcuts.finder)")
-        ]
+    private static func finderShortcutTitle(selectedPreset: TriggerModifierPreset) -> String {
+        "\(selectedPreset.shortcutLabel(forKeyLabel: "`"))  \(AppText.DockShortcuts.finder)"
     }
 
     private static func mappingRow(

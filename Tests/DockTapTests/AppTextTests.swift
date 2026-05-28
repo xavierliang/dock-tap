@@ -9,12 +9,12 @@ final class AppTextTests: XCTestCase {
     }
 
     func testMenuCommandNamesMatchM3Copy() {
-        XCTAssertEqual(AppText.Menu.showDockMapping, "Show Dock Mapping")
+        XCTAssertEqual(AppText.Menu.dockShortcuts, "Dock Shortcuts")
         XCTAssertEqual(AppText.Menu.updateDockShortcuts, "Update Dock Shortcuts")
         XCTAssertEqual(AppText.Menu.triggerModifierTitle("Left Option"), "Trigger Modifier: Left Option")
     }
 
-    func testAboutCombinesAppNameAndVersionWithSingleSpace() {
-        XCTAssertEqual(AppText.Menu.about(appName: "Dock Tap", version: "0.1.0"), "Dock Tap 0.1.0")
+    func testVersionTitleUsesCompactCopy() {
+        XCTAssertEqual(AppText.Menu.versionTitle(version: "0.1.0"), "Version 0.1.0")
     }
 }

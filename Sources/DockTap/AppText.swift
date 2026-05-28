@@ -14,7 +14,7 @@ enum AppText {
     }
 
     enum Menu {
-        static let showDockMapping = "Show Dock Mapping"
+        static let dockShortcuts = "Dock Shortcuts"
         static let triggerModifier = "Trigger Modifier"
         static let updateDockShortcuts = "Update Dock Shortcuts"
         static let showLogs = "Show Logs"
@@ -27,8 +27,8 @@ enum AppText {
             "\(triggerModifier): \(presetTitle)"
         }
 
-        static func about(appName: String, version: String) -> String {
-            "\(appName) \(version)"
+        static func versionTitle(version: String) -> String {
+            "Version \(version)"
         }
 
         static func updateAvailable(version: String) -> String {
@@ -37,8 +37,8 @@ enum AppText {
     }
 
     enum WindowSnap {
-        static let toggleTitle = "Window Snap"
-        static let submenuTitle = "Show Window Snap Bindings"
+        static let toggleTitle = "Enable Window Snap"
+        static let submenuTitle = "Window Snap Bindings"
         static let leftHalf = "Left Half"
         static let rightHalf = "Right Half"
         static let topHalf = "Top Half"

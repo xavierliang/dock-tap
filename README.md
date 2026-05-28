@@ -20,7 +20,7 @@ If the menu shows Accessibility as missing, choose `Check Accessibility` to prom
 
 ## Menu
 
-The main menu shows current readiness, the selected trigger preset, and how many Dock shortcuts are assigned. It includes the Finder shortcut example, while the full ten-slot Dock list lives under `Show Dock Mapping`.
+The main menu shows current readiness, the selected trigger preset, and how many Dock shortcuts are assigned. The `Dock Shortcuts` submenu shows the Finder shortcut plus the full ten-slot Dock list.
 
 Dock shortcuts update automatically on launch and each time the main menu opens. Use `Update Dock Shortcuts` as a manual fallback after changing Dock contents.
 
@@ -38,7 +38,7 @@ Only the selected physical key may be down. The opposite side or another Option,
 
 ## Window Snap
 
-Window Snap is off by default. Enable `Window Snap` from the menu to let the same trigger preset resize the focused window:
+Window Snap is off by default. Choose `Enable Window Snap` from the menu to let the same trigger preset resize the focused window:
 
 | Shortcut | Action |
 | --- | --- |
@@ -49,7 +49,7 @@ Window Snap is off by default. Enable `Window Snap` from the menu to let the sam
 | `<preset>+Return` | Maximize |
 | `<preset>+Space` | Center at 75% width and 75% height |
 
-The `Show Window Snap Bindings` submenu shows the exact bindings for the current trigger preset. Window Snap uses the focused window on its current display and does not cycle sizes or move windows between displays.
+The `Window Snap Bindings` submenu shows the exact bindings for the current trigger preset. Window Snap uses the focused window on its current display and does not cycle sizes or move windows between displays.
 
 When enabled, Window Snap uses the existing Accessibility trust to write other apps' window position and size, broadening Dock Tap's trust surface beyond app activation.
 

@@ -243,11 +243,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusMenu.addItem(disabledItem(menuModel.summaryTitle))
         statusMenu.addItem(.separator())
 
-        for row in menuModel.exampleRows {
-            statusMenu.addItem(disabledItem(row.title))
-        }
-
-        statusMenu.addItem(.separator())
         statusMenu.addItem(mappingMenuItem(menuModel))
         statusMenu.addItem(triggerModifierMenuItem(menuModel))
         statusMenu.addItem(.separator())
@@ -260,6 +255,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         windowSnapItem.state = menuModel.windowSnapToggleIsOn ? .on : .off
         statusMenu.addItem(windowSnapItem)
         statusMenu.addItem(windowSnapMenuItem(menuModel))
+        statusMenu.addItem(.separator())
 
         let loginItem = commandItem(title: loginMenuModel.title, action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
         loginItem.state = loginMenuModel.isChecked ? .on : .off
@@ -281,14 +277,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             statusMenu.addItem(commandItem(title: updateAvailableTitle, action: #selector(checkForUpdatesFromMenu), keyEquivalent: ""))
         }
         statusMenu.addItem(commandItem(title: menuModel.checkForUpdatesTitle, action: #selector(checkForUpdatesFromMenu), keyEquivalent: ""))
-        statusMenu.addItem(disabledItem(menuModel.aboutTitle))
+        statusMenu.addItem(disabledItem(menuModel.versionTitle))
         statusMenu.addItem(.separator())
         statusMenu.addItem(commandItem(title: menuModel.quitTitle, action: #selector(quit), keyEquivalent: ""))
     }
 
     private func mappingMenuItem(_ menuModel: MenuContentModel) -> NSMenuItem {
-        let item = NSMenuItem(title: menuModel.showDockMappingTitle, action: nil, keyEquivalent: "")
-        let submenu = NSMenu(title: menuModel.showDockMappingTitle)
+        let item = NSMenuItem(title: menuModel.dockShortcutsTitle, action: nil, keyEquivalent: "")
+        let submenu = NSMenu(title: menuModel.dockShortcutsTitle)
+        submenu.addItem(disabledItem(menuModel.finderShortcutTitle))
+        submenu.addItem(.separator())
         for row in menuModel.mappingRows {
             submenu.addItem(disabledItem(row.title))
         }

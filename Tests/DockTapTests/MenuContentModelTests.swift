@@ -2,7 +2,7 @@ import XCTest
 @testable import DockTap
 
 final class MenuContentModelTests: XCTestCase {
-    func testExamplesOnlyListFinderShortcut() {
+    func testDockShortcutsSubmenuIncludesFinderShortcutTitle() {
         let model = MenuContentModel(
             dockRows: (0..<10).map { row(index: $0, name: "Dock App \($0 + 1)") },
             selectedPreset: .leftOption,
@@ -13,16 +13,11 @@ final class MenuContentModelTests: XCTestCase {
             appVersion: "0.0.0"
         )
 
-        XCTAssertEqual(
-            model.exampleRows.map(\.title),
-            [
-                "Left Option+`  Finder"
-            ]
-        )
-        XCTAssertFalse(model.exampleRows.contains { $0.title.contains("Dock App") })
+        XCTAssertEqual(model.dockShortcutsTitle, "Dock Shortcuts")
+        XCTAssertEqual(model.finderShortcutTitle, "Left Option+`  Finder")
     }
 
-    func testMappingAlwaysContainsExactlyTenDockShortcutRowsWithoutFinder() {
+    func testMappingAlwaysContainsExactlyTenDockShortcutRows() {
         let model = MenuContentModel(
             dockRows: [
                 row(index: 0, name: "Safari", status: .active),
@@ -41,7 +36,6 @@ final class MenuContentModelTests: XCTestCase {
         XCTAssertEqual(model.mappingRows[0].title, "Right Command+1  Safari [active]")
         XCTAssertEqual(model.mappingRows[1].title, "Right Command+2  Unassigned")
         XCTAssertEqual(model.mappingRows[3].title, "Right Command+4  Mail [not running]")
-        XCTAssertFalse(model.mappingRows.contains { $0.title.contains("Finder") })
     }
 
     func testTriggerRowsMarkExactlyTheSelectedPreset() {
@@ -86,7 +80,7 @@ final class MenuContentModelTests: XCTestCase {
         )
 
         XCTAssertEqual(model.assignedShortcutCount, 10)
-        XCTAssertEqual(model.summaryTitle, "Ready | Left Control | 10 Dock shortcuts")
+        XCTAssertEqual(model.summaryTitle, "Ready · Left Control · 10 Dock shortcuts")
         XCTAssertFalse(model.summaryTitle.contains("skipped"))
         XCTAssertFalse(model.summaryTitle.contains("more"))
     }
@@ -111,7 +105,7 @@ final class MenuContentModelTests: XCTestCase {
             appVersion: "0.0.0"
         )
 
-        XCTAssertEqual(missing.summaryTitle, "Missing Accessibility Permission | Left Option | 0 Dock shortcuts")
+        XCTAssertEqual(missing.summaryTitle, "Missing Accessibility Permission · Left Option · 0 Dock shortcuts")
         XCTAssertEqual(missing.checkAccessibilityTitle, "Check Accessibility")
         XCTAssertEqual(missing.openAccessibilitySettingsTitle, "Open Accessibility Settings")
         XCTAssertNil(trusted.checkAccessibilityTitle)
@@ -129,7 +123,7 @@ final class MenuContentModelTests: XCTestCase {
             appVersion: "0.0.0"
         )
 
-        XCTAssertEqual(model.summaryTitle, "Ready | Left Command | 0 Dock shortcuts")
+        XCTAssertEqual(model.summaryTitle, "Ready · Left Command · 0 Dock shortcuts")
         XCTAssertFalse(model.summaryTitle.contains("Starting"))
     }
 
@@ -144,9 +138,9 @@ final class MenuContentModelTests: XCTestCase {
             appVersion: "0.0.0"
         )
 
-        XCTAssertEqual(model.windowSnapToggleTitle, "Window Snap")
+        XCTAssertEqual(model.windowSnapToggleTitle, "Enable Window Snap")
         XCTAssertTrue(model.windowSnapToggleIsOn)
-        XCTAssertEqual(model.windowSnapSubmenuTitle, "Show Window Snap Bindings")
+        XCTAssertEqual(model.windowSnapSubmenuTitle, "Window Snap Bindings")
         XCTAssertEqual(model.windowSnapRows.map(\.action), WindowAction.allCases)
         XCTAssertEqual(
             model.windowSnapRows.map(\.title),
@@ -161,7 +155,7 @@ final class MenuContentModelTests: XCTestCase {
         )
     }
 
-    func testAboutTitleCombinesAppNameAndVersion() {
+    func testVersionTitleShowsVersion() {
         let model = MenuContentModel(
             dockRows: [],
             selectedPreset: .leftOption,
@@ -172,7 +166,7 @@ final class MenuContentModelTests: XCTestCase {
             appVersion: "1.2.3"
         )
 
-        XCTAssertEqual(model.aboutTitle, "Dock Tap 1.2.3")
+        XCTAssertEqual(model.versionTitle, "Version 1.2.3")
     }
 
     func testCheckForUpdatesTitleAlwaysAvailableAndUpdateAvailableTitleReflectsVersion() {
