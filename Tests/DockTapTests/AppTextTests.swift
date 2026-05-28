@@ -13,4 +13,8 @@ final class AppTextTests: XCTestCase {
         XCTAssertEqual(AppText.Menu.updateDockShortcuts, "Update Dock Shortcuts")
         XCTAssertEqual(AppText.Menu.triggerModifierTitle("Left Option"), "Trigger Modifier: Left Option")
     }
+
+    func testAboutCombinesAppNameAndVersionWithSingleSpace() {
+        XCTAssertEqual(AppText.Menu.about(appName: "Dock Tap", version: "0.1.0"), "Dock Tap 0.1.0")
+    }
 }

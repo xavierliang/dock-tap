@@ -20,10 +20,19 @@ enum AppText {
         static let showLogs = "Show Logs"
         static let checkAccessibility = "Check Accessibility"
         static let openAccessibilitySettings = "Open Accessibility Settings"
+        static let checkForUpdates = "Check for Updates…"
         static let quit = "Quit"
 
         static func triggerModifierTitle(_ presetTitle: String) -> String {
             "\(triggerModifier): \(presetTitle)"
+        }
+
+        static func about(appName: String, version: String) -> String {
+            "\(appName) \(version)"
+        }
+
+        static func updateAvailable(version: String) -> String {
+            "Update Available: v\(version)"
         }
     }
 

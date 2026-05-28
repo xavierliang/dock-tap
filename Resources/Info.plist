@@ -18,8 +18,8 @@
     <string>DockTap</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>0.0.1</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.1</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
@@ -28,5 +28,13 @@
     <true/>
     <key>NSHumanReadableCopyright</key>
     <string>Dock Tap</string>
+    <key>SUFeedURL</key>
+    <string>https://xavierliang.github.io/dock-tap/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>MH4l9GYoFZwvf0H53B8cxmrrKbrp4+WZo5fsilzvDMM=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
 </dict>
 </plist>

@@ -34,6 +34,9 @@ struct MenuContentModel: Equatable {
     let showLogsTitle: String
     let checkAccessibilityTitle: String?
     let openAccessibilitySettingsTitle: String?
+    let updateAvailableTitle: String?
+    let checkForUpdatesTitle: String
+    let aboutTitle: String
     let quitTitle: String
     let assignedShortcutCount: Int
 
@@ -42,7 +45,10 @@ struct MenuContentModel: Equatable {
         selectedPreset: TriggerModifierPreset,
         isAccessibilityTrusted: Bool,
         isEventTapReady: Bool,
-        windowActionsEnabled: Bool
+        windowActionsEnabled: Bool,
+        appName: String,
+        appVersion: String,
+        availableUpdateVersion: String? = nil
     ) {
         let rowsByIndex = Dictionary(uniqueKeysWithValues: dockRows.map { ($0.target.shortcutIndex, $0) })
         let assignedCount = min(10, Set(rowsByIndex.keys.filter { (0..<10).contains($0) }).count)
@@ -79,6 +85,9 @@ struct MenuContentModel: Equatable {
         showLogsTitle = AppText.Menu.showLogs
         checkAccessibilityTitle = isAccessibilityTrusted ? nil : AppText.Menu.checkAccessibility
         openAccessibilitySettingsTitle = isAccessibilityTrusted ? nil : AppText.Menu.openAccessibilitySettings
+        updateAvailableTitle = availableUpdateVersion.map { AppText.Menu.updateAvailable(version: $0) }
+        checkForUpdatesTitle = AppText.Menu.checkForUpdates
+        aboutTitle = AppText.Menu.about(appName: appName, version: appVersion)
         quitTitle = AppText.Menu.quit
     }
 

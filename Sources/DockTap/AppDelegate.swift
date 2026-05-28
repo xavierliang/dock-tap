@@ -9,6 +9,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let dockSlotStore = DockSlotStore()
     private lazy var appActivator = AppActivator(logStore: logStore)
     private lazy var windowActor = WindowActor(logStore: logStore)
+    private lazy var updateController: UpdateController = {
+        let controller = UpdateController(logStore: logStore)
+        controller.onAvailabilityChanged = { [weak self] in
+            self?.rebuildMenu()
+        }
+        return controller
+    }()
 
     private var statusItem: NSStatusItem?
     private let statusMenu = NSMenu()
@@ -41,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         refreshDock(reason: "launch")
         checkPermission(prompt: true)
+        _ = updateController
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -67,6 +75,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func refreshDockFromMenu() {
         refreshDock(reason: "manual")
+    }
+
+    @objc private func checkForUpdatesFromMenu() {
+        updateController.checkForUpdates()
     }
 
     @objc private func selectTriggerModifierPreset(_ sender: NSMenuItem) {
@@ -222,7 +234,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             selectedPreset: selectedTriggerModifierPreset,
             isAccessibilityTrusted: isAccessibilityTrusted,
             isEventTapReady: didInstallTap,
-            windowActionsEnabled: windowActionsEnabled
+            windowActionsEnabled: windowActionsEnabled,
+            appName: appName,
+            appVersion: appVersion,
+            availableUpdateVersion: updateController.availableUpdateVersion
         )
 
         statusMenu.addItem(disabledItem(menuModel.summaryTitle))
@@ -261,6 +276,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         statusMenu.addItem(commandItem(title: menuModel.updateDockShortcutsTitle, action: #selector(refreshDockFromMenu), keyEquivalent: ""))
         statusMenu.addItem(commandItem(title: menuModel.showLogsTitle, action: #selector(showLogs), keyEquivalent: ""))
+        statusMenu.addItem(.separator())
+        if let updateAvailableTitle = menuModel.updateAvailableTitle {
+            statusMenu.addItem(commandItem(title: updateAvailableTitle, action: #selector(checkForUpdatesFromMenu), keyEquivalent: ""))
+        }
+        statusMenu.addItem(commandItem(title: menuModel.checkForUpdatesTitle, action: #selector(checkForUpdatesFromMenu), keyEquivalent: ""))
+        statusMenu.addItem(disabledItem(menuModel.aboutTitle))
         statusMenu.addItem(.separator())
         statusMenu.addItem(commandItem(title: menuModel.quitTitle, action: #selector(quit), keyEquivalent: ""))
     }
@@ -312,5 +333,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private var bundleIdentifier: String {
         Bundle.main.bundleIdentifier ?? "ai.resopod.docktap"
+    }
+
+    private var appName: String {
+        Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String ?? "Dock Tap"
+    }
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
     }
 }

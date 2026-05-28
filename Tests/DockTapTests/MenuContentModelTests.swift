@@ -8,7 +8,9 @@ final class MenuContentModelTests: XCTestCase {
             selectedPreset: .leftOption,
             isAccessibilityTrusted: true,
             isEventTapReady: true,
-            windowActionsEnabled: false
+            windowActionsEnabled: false,
+            appName: "Dock Tap",
+            appVersion: "0.0.0"
         )
 
         XCTAssertEqual(
@@ -29,7 +31,9 @@ final class MenuContentModelTests: XCTestCase {
             selectedPreset: .rightCommand,
             isAccessibilityTrusted: true,
             isEventTapReady: true,
-            windowActionsEnabled: false
+            windowActionsEnabled: false,
+            appName: "Dock Tap",
+            appVersion: "0.0.0"
         )
 
         XCTAssertEqual(model.mappingRows.count, 10)
@@ -46,7 +50,9 @@ final class MenuContentModelTests: XCTestCase {
             selectedPreset: .rightOption,
             isAccessibilityTrusted: true,
             isEventTapReady: true,
-            windowActionsEnabled: false
+            windowActionsEnabled: false,
+            appName: "Dock Tap",
+            appVersion: "0.0.0"
         )
 
         XCTAssertEqual(model.triggerModifierTitle, "Trigger Modifier: Right Option")
@@ -60,7 +66,9 @@ final class MenuContentModelTests: XCTestCase {
             selectedPreset: .leftOption,
             isAccessibilityTrusted: true,
             isEventTapReady: true,
-            windowActionsEnabled: false
+            windowActionsEnabled: false,
+            appName: "Dock Tap",
+            appVersion: "0.0.0"
         )
 
         XCTAssertEqual(model.updateDockShortcutsTitle, "Update Dock Shortcuts")
@@ -72,7 +80,9 @@ final class MenuContentModelTests: XCTestCase {
             selectedPreset: .leftControl,
             isAccessibilityTrusted: true,
             isEventTapReady: true,
-            windowActionsEnabled: false
+            windowActionsEnabled: false,
+            appName: "Dock Tap",
+            appVersion: "0.0.0"
         )
 
         XCTAssertEqual(model.assignedShortcutCount, 10)
@@ -87,14 +97,18 @@ final class MenuContentModelTests: XCTestCase {
             selectedPreset: .leftOption,
             isAccessibilityTrusted: false,
             isEventTapReady: false,
-            windowActionsEnabled: false
+            windowActionsEnabled: false,
+            appName: "Dock Tap",
+            appVersion: "0.0.0"
         )
         let trusted = MenuContentModel(
             dockRows: [],
             selectedPreset: .leftOption,
             isAccessibilityTrusted: true,
             isEventTapReady: true,
-            windowActionsEnabled: false
+            windowActionsEnabled: false,
+            appName: "Dock Tap",
+            appVersion: "0.0.0"
         )
 
         XCTAssertEqual(missing.summaryTitle, "Missing Accessibility Permission | Left Option | 0 Dock shortcuts")
@@ -110,7 +124,9 @@ final class MenuContentModelTests: XCTestCase {
             selectedPreset: .leftCommand,
             isAccessibilityTrusted: true,
             isEventTapReady: false,
-            windowActionsEnabled: false
+            windowActionsEnabled: false,
+            appName: "Dock Tap",
+            appVersion: "0.0.0"
         )
 
         XCTAssertEqual(model.summaryTitle, "Ready | Left Command | 0 Dock shortcuts")
@@ -123,7 +139,9 @@ final class MenuContentModelTests: XCTestCase {
             selectedPreset: .leftOption,
             isAccessibilityTrusted: true,
             isEventTapReady: true,
-            windowActionsEnabled: true
+            windowActionsEnabled: true,
+            appName: "Dock Tap",
+            appVersion: "0.0.0"
         )
 
         XCTAssertEqual(model.windowSnapToggleTitle, "Window Snap")
@@ -141,6 +159,47 @@ final class MenuContentModelTests: XCTestCase {
                 "Left Option+Space  Center"
             ]
         )
+    }
+
+    func testAboutTitleCombinesAppNameAndVersion() {
+        let model = MenuContentModel(
+            dockRows: [],
+            selectedPreset: .leftOption,
+            isAccessibilityTrusted: true,
+            isEventTapReady: true,
+            windowActionsEnabled: false,
+            appName: "Dock Tap",
+            appVersion: "1.2.3"
+        )
+
+        XCTAssertEqual(model.aboutTitle, "Dock Tap 1.2.3")
+    }
+
+    func testCheckForUpdatesTitleAlwaysAvailableAndUpdateAvailableTitleReflectsVersion() {
+        let withoutUpdate = MenuContentModel(
+            dockRows: [],
+            selectedPreset: .leftOption,
+            isAccessibilityTrusted: true,
+            isEventTapReady: true,
+            windowActionsEnabled: false,
+            appName: "Dock Tap",
+            appVersion: "0.1.0"
+        )
+        let withUpdate = MenuContentModel(
+            dockRows: [],
+            selectedPreset: .leftOption,
+            isAccessibilityTrusted: true,
+            isEventTapReady: true,
+            windowActionsEnabled: false,
+            appName: "Dock Tap",
+            appVersion: "0.1.0",
+            availableUpdateVersion: "0.2.0"
+        )
+
+        XCTAssertEqual(withoutUpdate.checkForUpdatesTitle, "Check for Updates…")
+        XCTAssertNil(withoutUpdate.updateAvailableTitle)
+        XCTAssertEqual(withUpdate.checkForUpdatesTitle, "Check for Updates…")
+        XCTAssertEqual(withUpdate.updateAvailableTitle, "Update Available: v0.2.0")
     }
 
     private func row(

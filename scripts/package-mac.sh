@@ -333,8 +333,35 @@ copy_resource StatusBarIconTemplate@2x.png
 /bin/chmod +x "$MACOS/$APP_NAME"
 /usr/bin/plutil -lint "$CONTENTS/Info.plist" >/dev/null
 
+SPARKLE_FRAMEWORK_SRC="$BIN_DIR/Sparkle.framework"
+[[ -d "$SPARKLE_FRAMEWORK_SRC" ]] || fail "Sparkle.framework not found at $SPARKLE_FRAMEWORK_SRC; run 'swift build -c release --arch arm64' to fetch dependencies"
+
+log "Embedding Sparkle.framework"
+mkdir -p "$CONTENTS/Frameworks"
+/usr/bin/ditto "$SPARKLE_FRAMEWORK_SRC" "$CONTENTS/Frameworks/Sparkle.framework"
+
+log "Signing Sparkle helpers bottom-up"
+SPARKLE_DST="$CONTENTS/Frameworks/Sparkle.framework"
+SPARKLE_CURRENT="$SPARKLE_DST/Versions/Current"
+[[ -d "$SPARKLE_CURRENT" ]] || fail "Sparkle.framework/Versions/Current not found in embedded framework"
+
+sign_if_present() {
+    local target="$1"
+    if [[ -e "$target" ]]; then
+        /usr/bin/codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$target"
+    fi
+}
+
+# Order matters: nested executables/bundles before the framework itself.
+for xpc in "$SPARKLE_CURRENT/XPCServices/"*.xpc; do
+    sign_if_present "$xpc"
+done
+sign_if_present "$SPARKLE_CURRENT/Autoupdate"
+sign_if_present "$SPARKLE_CURRENT/Updater.app"
+/usr/bin/codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$SPARKLE_DST"
+
 log "Signing app with Developer ID and hardened runtime"
-/usr/bin/codesign --force --deep --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$APP"
+/usr/bin/codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$APP"
 verify_app_signature
 
 if [[ "$ARTIFACT_KIND" == "dmg" ]]; then
