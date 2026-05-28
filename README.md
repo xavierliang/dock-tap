@@ -2,6 +2,18 @@
 
 Dock Tap is a macOS 13+ menu bar app that maps one physical modifier preset plus `1` through `0` to the first ten Dock apps. The same preset plus backtick activates Finder.
 
+## Install
+
+Download the latest `DockTap-<version>-arm64.dmg` from GitHub Releases, open it, and drag `DockTap.app` to `/Applications`.
+
+On first launch, grant Dock Tap Accessibility access in System Settings. Dock Tap uses that permission to activate Dock apps and, when enabled, resize the focused window.
+
+## Usage
+
+Launch Dock Tap from `/Applications`. Choose a trigger preset from the menu bar item, then hold that physical modifier and press `1` through `0` to activate the matching Dock app. Press the same modifier plus backtick to activate Finder.
+
+Use the menu to refresh Dock shortcuts, enable or disable Window Snap, and configure Launch at Login.
+
 ## Build and Run
 
 Use a stable Apple Development signing identity for Accessibility/TCC validation:
