@@ -4,7 +4,7 @@ Dock Tap is a macOS 13+ menu bar app that maps one physical modifier preset plus
 
 ## Install
 
-Download the latest `DockTap-<version>-arm64.dmg` from GitHub Releases, open it, and drag `DockTap.app` to `/Applications`.
+Download the latest notarized `DockTap-<version>-arm64.dmg` from GitHub Releases, open it, and drag `DockTap.app` to `/Applications`.
 
 On first launch, grant Dock Tap Accessibility access in System Settings. Dock Tap uses that permission to activate Dock apps and, when enabled, resize the focused window.
 
@@ -13,6 +13,8 @@ On first launch, grant Dock Tap Accessibility access in System Settings. Dock Ta
 Launch Dock Tap from `/Applications`. Choose a trigger preset from the menu bar item, then hold that physical modifier and press `1` through `0` to activate the matching Dock app. Press the same modifier plus backtick to activate Finder.
 
 Use the menu to refresh Dock shortcuts, enable or disable Window Snap, and configure Launch at Login.
+
+Use `Check for Updates…` to open the Sparkle updater. Dock Tap also lets Sparkle handle scheduled background update prompts when a signed update is available.
 
 ## Build and Run
 
@@ -77,7 +79,7 @@ The menu reads Launch at Login state from `SMAppService.mainApp.status`. If macO
 
 ## Known Limits
 
-Dock Tap reads Dock preferences on launch/menu open and does not mutate Dock contents. It does not cycle windows, remap slots, support Custom triggers, notarize releases, or install an updater.
+Dock Tap is arm64-only and requires macOS 13 or newer. It reads Dock preferences on launch/menu open and treats Dock slots as read-only; it does not mutate Dock contents, remap slots, or support custom triggers. Window Snap covers only the listed fixed actions and is not a Rectangle replacement. Sparkle updates download the full DMG because delta updates are not currently published.
 
 ## License
 

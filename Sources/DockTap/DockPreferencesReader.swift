@@ -14,16 +14,32 @@ struct DockPreferencesParseResult: Equatable {
 }
 
 struct DockPreferencesReader {
+    private let preferencesAppID: CFString
+    private let copyPreferenceValue: (CFString, CFString) -> Any?
+    private let synchronizePreferences: (CFString) -> Bool
     private let fileManager: FileManager
 
-    init(fileManager: FileManager = .default) {
+    init(
+        fileManager: FileManager = .default,
+        preferencesAppID: CFString = "com.apple.dock" as CFString,
+        copyPreferenceValue: @escaping (CFString, CFString) -> Any? = { key, appID in
+            CFPreferencesCopyAppValue(key, appID)
+        },
+        synchronizePreferences: @escaping (CFString) -> Bool = { appID in
+            CFPreferencesAppSynchronize(appID)
+        }
+    ) {
         self.fileManager = fileManager
+        self.preferencesAppID = preferencesAppID
+        self.copyPreferenceValue = copyPreferenceValue
+        self.synchronizePreferences = synchronizePreferences
     }
 
     func readCurrentDockApps(limit: Int = 10) -> DockPreferencesParseResult {
-        guard let persistentApps = CFPreferencesCopyAppValue(
+        _ = synchronizePreferences(preferencesAppID)
+        guard let persistentApps = copyPreferenceValue(
             "persistent-apps" as CFString,
-            "com.apple.dock" as CFString
+            preferencesAppID
         ) else {
             return DockPreferencesParseResult(apps: [], skippedCount: 0)
         }

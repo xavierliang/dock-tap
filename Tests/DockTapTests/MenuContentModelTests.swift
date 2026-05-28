@@ -112,7 +112,41 @@ final class MenuContentModelTests: XCTestCase {
         XCTAssertNil(trusted.openAccessibilitySettingsTitle)
     }
 
-    func testSummaryDoesNotShowStartingWhenAccessibilityIsTrustedButTapIsNotReady() {
+    func testSummaryStatusPrioritizesAccessibilityThenTapReadiness() {
+        let missing = MenuContentModel(
+            dockRows: [],
+            selectedPreset: .leftOption,
+            isAccessibilityTrusted: false,
+            isEventTapReady: false,
+            windowActionsEnabled: false,
+            appName: "Dock Tap",
+            appVersion: "0.0.0"
+        )
+        let starting = MenuContentModel(
+            dockRows: [],
+            selectedPreset: .leftCommand,
+            isAccessibilityTrusted: true,
+            isEventTapReady: false,
+            windowActionsEnabled: false,
+            appName: "Dock Tap",
+            appVersion: "0.0.0"
+        )
+        let ready = MenuContentModel(
+            dockRows: [],
+            selectedPreset: .rightOption,
+            isAccessibilityTrusted: true,
+            isEventTapReady: true,
+            windowActionsEnabled: false,
+            appName: "Dock Tap",
+            appVersion: "0.0.0"
+        )
+
+        XCTAssertEqual(missing.summaryTitle, "Missing Accessibility Permission · Left Option · 0 Dock shortcuts")
+        XCTAssertEqual(starting.summaryTitle, "Starting · Left Command · 0 Dock shortcuts")
+        XCTAssertEqual(ready.summaryTitle, "Ready · Right Option · 0 Dock shortcuts")
+    }
+
+    func testSummaryShowsStartingWhenAccessibilityIsTrustedButTapIsNotReady() {
         let model = MenuContentModel(
             dockRows: [],
             selectedPreset: .leftCommand,
@@ -123,8 +157,7 @@ final class MenuContentModelTests: XCTestCase {
             appVersion: "0.0.0"
         )
 
-        XCTAssertEqual(model.summaryTitle, "Ready · Left Command · 0 Dock shortcuts")
-        XCTAssertFalse(model.summaryTitle.contains("Starting"))
+        XCTAssertEqual(model.summaryTitle, "Starting · Left Command · 0 Dock shortcuts")
     }
 
     func testWindowSnapToggleAndRowsUseSelectedPreset() {

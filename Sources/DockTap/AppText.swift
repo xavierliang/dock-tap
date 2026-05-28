@@ -1,6 +1,7 @@
 enum AppText {
     enum Status {
         static let ready = "Ready"
+        static let starting = "Starting"
         static let missingAccessibilityPermission = "Missing Accessibility Permission"
     }
 

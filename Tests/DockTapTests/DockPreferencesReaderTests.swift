@@ -13,6 +13,25 @@ final class DockPreferencesReaderTests: XCTestCase {
         try super.tearDownWithError()
     }
 
+    func testReadSynchronizesDockPreferencesBeforeCopyingPersistentApps() {
+        var calls: [String] = []
+        let reader = DockPreferencesReader(
+            copyPreferenceValue: { key, appID in
+                calls.append("copy:\(key as String):\(appID as String)")
+                return ["persistent-apps": []]
+            },
+            synchronizePreferences: { appID in
+                calls.append("sync:\(appID as String)")
+                return true
+            }
+        )
+
+        let result = reader.readCurrentDockApps()
+
+        XCTAssertEqual(result, DockPreferencesParseResult(apps: [], skippedCount: 0))
+        XCTAssertEqual(calls, ["sync:com.apple.dock", "copy:persistent-apps:com.apple.dock"])
+    }
+
     func testParsesAppsInDockOrderAndSkipsNonAppTiles() throws {
         let firstApp = try makeTemporaryApp(named: "First.app")
         let secondApp = try makeTemporaryApp(named: "Second.app")

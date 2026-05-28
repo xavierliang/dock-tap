@@ -48,7 +48,10 @@ struct MenuContentModel: Equatable {
     ) {
         let rowsByIndex = Dictionary(uniqueKeysWithValues: dockRows.map { ($0.target.shortcutIndex, $0) })
         let assignedCount = min(10, Set(rowsByIndex.keys.filter { (0..<10).contains($0) }).count)
-        let statusTitle = Self.statusTitle(isAccessibilityTrusted: isAccessibilityTrusted)
+        let statusTitle = Self.statusTitle(
+            isAccessibilityTrusted: isAccessibilityTrusted,
+            isEventTapReady: isEventTapReady
+        )
 
         summaryTitle = [
             statusTitle,
@@ -87,9 +90,12 @@ struct MenuContentModel: Equatable {
         quitTitle = AppText.Menu.quit
     }
 
-    private static func statusTitle(isAccessibilityTrusted: Bool) -> String {
+    private static func statusTitle(isAccessibilityTrusted: Bool, isEventTapReady: Bool) -> String {
         guard isAccessibilityTrusted else {
             return AppText.Status.missingAccessibilityPermission
+        }
+        guard isEventTapReady else {
+            return AppText.Status.starting
         }
         return AppText.Status.ready
     }

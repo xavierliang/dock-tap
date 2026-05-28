@@ -39,12 +39,10 @@ extension UpdateController: SPUUpdaterDelegate {
 }
 
 extension UpdateController: SPUStandardUserDriverDelegate {
-    var supportsGentleScheduledUpdateReminders: Bool { true }
-
     func standardUserDriverShouldHandleShowingScheduledUpdate(
         _ update: SUAppcastItem,
         andInImmediateFocus immediateFocus: Bool
     ) -> Bool {
-        false
+        true
     }
 }
