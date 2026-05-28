@@ -333,6 +333,24 @@ copy_resource StatusBarIconTemplate@2x.png
 /bin/chmod +x "$MACOS/$APP_NAME"
 /usr/bin/plutil -lint "$CONTENTS/Info.plist" >/dev/null
 
+log "Fixing runtime search paths in main executable"
+# Strip absolute RPATHs pointing at the build machine's Xcode toolchain — they
+# leak host-specific paths into the shipped binary and at best cause failed
+# dyld lookups on user machines.
+/usr/bin/otool -l "$MACOS/$APP_NAME" \
+    | /usr/bin/awk '/cmd LC_RPATH/{want=1; next} want && /path /{print $2; want=0}' \
+    | while IFS= read -r rpath; do
+        case "$rpath" in
+            /Applications/Xcode*.app/*|/Library/Developer/CommandLineTools/*)
+                log "  removing host RPATH: $rpath"
+                /usr/bin/install_name_tool -delete_rpath "$rpath" "$MACOS/$APP_NAME"
+                ;;
+        esac
+    done
+# Point dyld at the embedded Frameworks directory so @rpath/Sparkle.framework
+# resolves to Contents/Frameworks/Sparkle.framework.
+/usr/bin/install_name_tool -add_rpath "@executable_path/../Frameworks" "$MACOS/$APP_NAME"
+
 SPARKLE_FRAMEWORK_SRC="$BIN_DIR/Sparkle.framework"
 [[ -d "$SPARKLE_FRAMEWORK_SRC" ]] || fail "Sparkle.framework not found at $SPARKLE_FRAMEWORK_SRC; run 'swift build -c release --arch arm64' to fetch dependencies"
 
