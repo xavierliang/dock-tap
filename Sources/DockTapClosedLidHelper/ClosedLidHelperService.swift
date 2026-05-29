@@ -95,7 +95,7 @@ public final class ClosedLidHelperService: NSObject, ClosedLidHelperXPCProtocol 
         case .inactive:
             logger.info("journal recovery found no active lease")
         case .success where result.lease != nil:
-            logger.info("journal recovery resumed token=\(result.lease?.token ?? "-")")
+            logger.info("journal recovery resumed active lease")
         case .success where result.pmsetRestoreConfirmed:
             logger.info("journal recovery restored normal sleep")
         default:
@@ -104,8 +104,7 @@ public final class ClosedLidHelperService: NSObject, ClosedLidHelperXPCProtocol 
     }
 
     private func log(_ operation: String, result: ClosedLidCoreResult) {
-        let token = result.lease?.token ?? "-"
-        let message = "\(operation) outcome=\(result.outcome.rawValue) token=\(token) restore=\(result.pmsetRestoreConfirmed) error=\(result.errorMessage ?? "-")"
+        let message = "\(operation) outcome=\(result.outcome.rawValue) activeLease=\(result.lease != nil) restore=\(result.pmsetRestoreConfirmed) error=\(result.errorMessage ?? "-")"
 
         switch result.outcome {
         case .success, .inactive, .alreadyActive:

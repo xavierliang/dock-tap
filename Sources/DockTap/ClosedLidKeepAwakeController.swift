@@ -97,10 +97,20 @@ final class ClosedLidKeepAwakeController {
             case .ready:
                 self.startPreparedSession(duration: duration)
             case .requiresApproval:
+                if self.finishDeferredStopWithoutSession(
+                    logMessage: "closed-lid helper preparation requires approval while stop pending"
+                ) {
+                    return
+                }
                 self.state = .requiresApproval
                 self.logStore.append("closed-lid helper requires approval")
                 self.showApprovalRequiredAlert()
             case .notFound(let message), .failure(let message):
+                if self.finishDeferredStopWithoutSession(
+                    logMessage: "closed-lid helper preparation failed while stop pending: \(message)"
+                ) {
+                    return
+                }
                 self.state = .error(message)
                 self.logStore.append("closed-lid helper preparation failed: \(message)")
             }
@@ -235,7 +245,7 @@ final class ClosedLidKeepAwakeController {
         renewalTimer = timer
     }
 
-    @objc private func renewLease() {
+    @objc func renewLease() {
         guard state.isActive, let activeToken else {
             clearActiveSession()
             return
@@ -255,8 +265,9 @@ final class ClosedLidKeepAwakeController {
                 self.state = .requiresApproval
                 self.logStore.append("closed-lid helper requires approval during renewal")
             case .failure(let message):
-                self.clearActiveSession()
-                self.state = .error(message)
+                self.renewalTimer?.invalidate()
+                self.renewalTimer = nil
+                self.state = .errorWithActiveSession(message)
                 self.logStore.append("closed-lid renewal failed: \(message)")
             }
         }
@@ -322,7 +333,7 @@ final class ClosedLidKeepAwakeController {
         }
 
         activeToken = session.token
-        logStore.append("closed-lid start completed while stop pending; stopping token=\(session.token)")
+        logStore.append("closed-lid start completed while stop pending; stopping active session")
         helperClient.stop(token: session.token, reason: activeStopReason) { [weak self] result in
             guard let self, self.stopRequestedDuringStart else { return }
             self.stopRequestedDuringStart = false
@@ -335,6 +346,23 @@ final class ClosedLidKeepAwakeController {
             case .failure(let message):
                 self.completeDeferredStop(success: false, message: message)
             }
+        }
+        return true
+    }
+
+    private func finishDeferredStopWithoutSession(logMessage: String) -> Bool {
+        guard stopRequestedDuringStart || isStopInFlight else {
+            return false
+        }
+
+        stopRequestedDuringStart = false
+        clearActiveSession()
+        logStore.append(logMessage)
+
+        if isStopInFlight {
+            completeStop(success: true, message: nil)
+        } else {
+            state = .off
         }
         return true
     }

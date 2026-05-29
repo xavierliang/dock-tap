@@ -18,10 +18,7 @@
     <true/>
 
     <key>KeepAlive</key>
-    <dict>
-        <key>Crashed</key>
-        <true/>
-    </dict>
+    <true/>
 
     <key>ProcessType</key>
     <string>Background</string>

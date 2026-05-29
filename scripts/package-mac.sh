@@ -149,6 +149,10 @@ verify_launch_daemon_plist() {
     local mach_service
     mach_service="$(plist_value ":MachServices:$HELPER_MACH_SERVICE" "$plist")"
     [[ "$mach_service" == "true" ]] || fail "LaunchDaemon MachServices missing $HELPER_MACH_SERVICE"
+
+    local keep_alive
+    keep_alive="$(plist_value ":KeepAlive" "$plist")"
+    [[ "$keep_alive" == "true" ]] || fail "LaunchDaemon KeepAlive must restart after non-crash exits"
 }
 
 strip_host_rpaths() {

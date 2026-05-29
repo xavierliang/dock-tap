@@ -68,6 +68,11 @@ protocol ClosedLidHelperClienting: AnyObject {
     func invalidate()
 }
 
+private enum ReregistrationReadiness {
+    case inactiveOrRestored
+    case blocked(String)
+}
+
 final class ClosedLidHelperClient: ClosedLidHelperClienting {
     private static let daemonPlistName = "\(ClosedLidIPCConstants.launchDaemonLabel).plist"
     private static let helperExecutableName = "DockTapClosedLidHelper"
@@ -76,6 +81,9 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
     private let service: any ClosedLidServiceManaging
     private let defaults: UserDefaults
     private let logStore: LogStore
+    private let reregistrationStatusProvider: ((@escaping (ClosedLidHelperStatusResult) -> Void) -> Void)?
+    private let reregistrationStopper: ((String, String, @escaping (ClosedLidHelperStopResult) -> Void) -> Void)?
+    private let reregistrationWaitTimeout: TimeInterval
     private let registrationQueue = DispatchQueue(label: "ai.resopod.docktap.closedlidhelper.registration")
 
     private var connection: NSXPCConnection?
@@ -83,11 +91,17 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
     init(
         service: any ClosedLidServiceManaging = SMAppService.daemon(plistName: ClosedLidHelperClient.daemonPlistName),
         defaults: UserDefaults = .standard,
-        logStore: LogStore
+        logStore: LogStore,
+        reregistrationStatusProvider: ((@escaping (ClosedLidHelperStatusResult) -> Void) -> Void)? = nil,
+        reregistrationStopper: ((String, String, @escaping (ClosedLidHelperStopResult) -> Void) -> Void)? = nil,
+        reregistrationWaitTimeout: TimeInterval = 5
     ) {
         self.service = service
         self.defaults = defaults
         self.logStore = logStore
+        self.reregistrationStatusProvider = reregistrationStatusProvider
+        self.reregistrationStopper = reregistrationStopper
+        self.reregistrationWaitTimeout = reregistrationWaitTimeout
     }
 
     func prepareForUse(completion: @escaping (ClosedLidHelperPreparationResult) -> Void) {
@@ -231,6 +245,13 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
     }
 
     private func reregisterHelper() -> ClosedLidHelperPreparationResult {
+        switch proveOldHelperInactiveOrRestored() {
+        case .inactiveOrRestored:
+            invalidate()
+        case .blocked(let message):
+            return .failure(message)
+        }
+
         do {
             try service.unregister()
         } catch {
@@ -245,6 +266,104 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
         } catch {
             return registrationFailureResult(error, shouldAcceptAlreadyRegistered: false)
         }
+    }
+
+    private func proveOldHelperInactiveOrRestored() -> ReregistrationReadiness {
+        guard let status = waitForOldHelperStatus() else {
+            return reregistrationBlocked("helper re-registration blocked: old helper status timed out")
+        }
+
+        switch status {
+        case .inactive:
+            return .inactiveOrRestored
+        case .active(let session):
+            return stopOldHelperBeforeReregistration(session)
+        case .failureWithActiveSession(let session, let message):
+            logStore.append("closed-lid helper re-registration status failed with active session: \(message)")
+            return stopOldHelperBeforeReregistration(session)
+        case .requiresApproval:
+            return reregistrationBlocked("helper re-registration blocked: old helper requires approval before it can be stopped")
+        case .failure(let message):
+            return reregistrationBlocked("helper re-registration blocked: could not verify old helper status: \(message)")
+        }
+    }
+
+    private func stopOldHelperBeforeReregistration(_ session: ClosedLidHelperSession) -> ReregistrationReadiness {
+        guard let result = waitForOldHelperStop(token: session.token) else {
+            return reregistrationBlocked("helper re-registration blocked: old helper stop timed out")
+        }
+
+        switch result {
+        case .stopped:
+            logStore.append("closed-lid helper old generation stopped before re-registration")
+            return .inactiveOrRestored
+        case .requiresApproval:
+            return reregistrationBlocked("helper re-registration blocked: old helper requires approval before it can be stopped")
+        case .failure(let message):
+            return reregistrationBlocked("helper re-registration blocked: old helper stop failed: \(message)")
+        }
+    }
+
+    private func waitForOldHelperStatus() -> ClosedLidHelperStatusResult? {
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: ClosedLidHelperStatusResult?
+
+        let provider: (@escaping (ClosedLidHelperStatusResult) -> Void) -> Void
+        if let reregistrationStatusProvider {
+            provider = reregistrationStatusProvider
+        } else {
+            provider = { [weak self] (completion: @escaping (ClosedLidHelperStatusResult) -> Void) in
+                guard let self else {
+                    completion(.failure("helper client was released"))
+                    return
+                }
+                self.status(completion: completion)
+            }
+        }
+        provider {
+            result = $0
+            semaphore.signal()
+        }
+
+        guard semaphore.wait(timeout: reregistrationTimeout) == .success else {
+            return nil
+        }
+        return result
+    }
+
+    private func waitForOldHelperStop(token: String) -> ClosedLidHelperStopResult? {
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: ClosedLidHelperStopResult?
+
+        let stopper: (String, String, @escaping (ClosedLidHelperStopResult) -> Void) -> Void
+        if let reregistrationStopper {
+            stopper = reregistrationStopper
+        } else {
+            stopper = { [weak self] token, reason, completion in
+                guard let self else {
+                    completion(.failure("helper client was released"))
+                    return
+                }
+                self.stop(token: token, reason: reason, completion: completion)
+            }
+        }
+        stopper(token, "helperReregistration") {
+            result = $0
+            semaphore.signal()
+        }
+
+        guard semaphore.wait(timeout: reregistrationTimeout) == .success else {
+            return nil
+        }
+        return result
+    }
+
+    private var reregistrationTimeout: DispatchTime {
+        .now() + .milliseconds(Int(reregistrationWaitTimeout * 1_000))
+    }
+
+    private func reregistrationBlocked(_ message: String) -> ReregistrationReadiness {
+        .blocked("\(message). \(AppText.ClosedLid.manualRecovery)")
     }
 
     private func resultAfterRegistration() -> ClosedLidHelperPreparationResult {

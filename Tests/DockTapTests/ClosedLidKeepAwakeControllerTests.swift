@@ -255,6 +255,33 @@ final class ClosedLidKeepAwakeControllerTests: XCTestCase {
         XCTAssertEqual(controller.state, .stopFailed("restore still failed"))
     }
 
+    func testStopBeforeTerminationDuringPendingPrepareAllowsQuitWhenApprovalIsRequired() {
+        assertDeferredStopDuringPendingPrepareCompletesSuccessfully(.requiresApproval)
+    }
+
+    func testStopBeforeTerminationDuringPendingPrepareAllowsQuitWhenHelperIsMissing() {
+        assertDeferredStopDuringPendingPrepareCompletesSuccessfully(.notFound("helper missing"))
+    }
+
+    func testStopBeforeTerminationDuringPendingPrepareAllowsQuitWhenPreparationFails() {
+        assertDeferredStopDuringPendingPrepareCompletesSuccessfully(.failure("registration failed"))
+    }
+
+    func testRenewalFailurePreservesStopNowToken() {
+        settingsStore.hasSeenClosedLidWarning = true
+        helperClient.startResults.append(.started(.indefinite(token: "renew-token")))
+        helperClient.renewResults.append(.failure("xpc failed"))
+
+        controller.enableIndefinitely()
+        controller.renewLease()
+        XCTAssertEqual(controller.state, .errorWithActiveSession("xpc failed"))
+        controller.stopNow()
+
+        XCTAssertEqual(controller.state, .off)
+        XCTAssertEqual(helperClient.stopTokens, ["renew-token"])
+        XCTAssertEqual(helperClient.stopReasons, ["menu"])
+    }
+
     func testRefreshStatusErrorWithActiveLeasePreservesStopNowToken() {
         helperClient.statusResults.append(.failureWithActiveSession(
             .indefinite(token: "status-token"),
@@ -267,6 +294,33 @@ final class ClosedLidKeepAwakeControllerTests: XCTestCase {
         XCTAssertEqual(controller.state, .off)
         XCTAssertEqual(helperClient.stopTokens, ["status-token"])
         XCTAssertEqual(helperClient.stopReasons, ["menu"])
+    }
+
+    private func assertDeferredStopDuringPendingPrepareCompletesSuccessfully(
+        _ preparationResult: ClosedLidHelperPreparationResult,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        settingsStore.hasSeenClosedLidWarning = true
+        helperClient.prepareResults = []
+
+        controller.enableForOneHour()
+        XCTAssertEqual(controller.state, .starting, file: file, line: line)
+
+        var completion: (success: Bool, message: String?)?
+        controller.stopBeforeTermination(reason: "update") { success, message in
+            completion = (success, message)
+        }
+
+        XCTAssertEqual(controller.state, .stopping, file: file, line: line)
+        helperClient.completePendingPrepare(preparationResult)
+
+        XCTAssertEqual(completion?.success, true, file: file, line: line)
+        XCTAssertNil(completion?.message, file: file, line: line)
+        XCTAssertEqual(controller.state, .off, file: file, line: line)
+        XCTAssertTrue(helperClient.startDurations.isEmpty, file: file, line: line)
+        XCTAssertTrue(helperClient.stopTokens.isEmpty, file: file, line: line)
+        XCTAssertTrue(AlertRunModalStub.alerts.isEmpty, file: file, line: line)
     }
 
     private func XCTAssertActiveTimed(
@@ -287,6 +341,7 @@ final class ClosedLidKeepAwakeControllerTests: XCTestCase {
 private final class FakeClosedLidHelperClient: ClosedLidHelperClienting {
     var prepareResults: [ClosedLidHelperPreparationResult] = [.ready]
     var startResults: [ClosedLidHelperStartResult] = []
+    var renewResults: [ClosedLidHelperRenewResult] = []
     var stopResults: [ClosedLidHelperStopResult] = []
     var statusResults: [ClosedLidHelperStatusResult] = []
 
@@ -295,11 +350,22 @@ private final class FakeClosedLidHelperClient: ClosedLidHelperClienting {
     private(set) var stopTokens: [String?] = []
     private(set) var stopReasons: [String] = []
     private(set) var openApprovalSettingsCallCount = 0
+    private var pendingPrepareCompletion: ((ClosedLidHelperPreparationResult) -> Void)?
     private var pendingStartCompletion: ((ClosedLidHelperStartResult) -> Void)?
 
     func prepareForUse(completion: @escaping (ClosedLidHelperPreparationResult) -> Void) {
         prepareCallCount += 1
-        completion(prepareResults.isEmpty ? .ready : prepareResults.removeFirst())
+        if prepareResults.isEmpty {
+            pendingPrepareCompletion = completion
+        } else {
+            completion(prepareResults.removeFirst())
+        }
+    }
+
+    func completePendingPrepare(_ result: ClosedLidHelperPreparationResult) {
+        let completion = pendingPrepareCompletion
+        pendingPrepareCompletion = nil
+        completion?(result)
     }
 
     func start(duration: TimeInterval?, completion: @escaping (ClosedLidHelperStartResult) -> Void) {
@@ -318,7 +384,7 @@ private final class FakeClosedLidHelperClient: ClosedLidHelperClienting {
     }
 
     func renewLease(token: String, completion: @escaping (ClosedLidHelperRenewResult) -> Void) {
-        completion(.renewed)
+        completion(renewResults.isEmpty ? .renewed : renewResults.removeFirst())
     }
 
     func stop(token: String?, reason: String, completion: @escaping (ClosedLidHelperStopResult) -> Void) {

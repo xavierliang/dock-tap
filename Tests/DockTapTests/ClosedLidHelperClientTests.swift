@@ -8,6 +8,11 @@ final class ClosedLidHelperClientTests: XCTestCase {
     private var defaults: UserDefaults!
     private var service: FakeClosedLidService!
     private var client: ClosedLidHelperClient!
+    private var reregistrationStatusResults: [ClosedLidHelperStatusResult]!
+    private var reregistrationStopResults: [ClosedLidHelperStopResult]!
+    private var reregistrationStopTokens: [String]!
+    private var reregistrationStopReasons: [String]!
+    private var reregistrationEvents: [String]!
 
     override func setUp() {
         super.setUp()
@@ -15,10 +20,36 @@ final class ClosedLidHelperClientTests: XCTestCase {
         defaults = UserDefaults(suiteName: suiteName)
         defaults.removePersistentDomain(forName: suiteName)
         service = FakeClosedLidService(status: .enabled)
+        reregistrationStatusResults = [.inactive]
+        reregistrationStopResults = [.stopped]
+        reregistrationStopTokens = []
+        reregistrationStopReasons = []
+        reregistrationEvents = []
+        service.eventRecorder = { [weak self] event in
+            self?.reregistrationEvents.append(event)
+        }
         client = ClosedLidHelperClient(
             service: service,
             defaults: defaults,
-            logStore: LogStore()
+            logStore: LogStore(),
+            reregistrationStatusProvider: { [weak self] completion in
+                self?.reregistrationEvents.append("status")
+                guard let self else {
+                    completion(.failure("test client released"))
+                    return
+                }
+                completion(self.reregistrationStatusResults.removeFirstOrDefault(.inactive))
+            },
+            reregistrationStopper: { [weak self] token, reason, completion in
+                self?.reregistrationEvents.append("stop")
+                self?.reregistrationStopTokens.append(token)
+                self?.reregistrationStopReasons.append(reason)
+                guard let self else {
+                    completion(.failure("test client released"))
+                    return
+                }
+                completion(self.reregistrationStopResults.removeFirstOrDefault(.stopped))
+            }
         )
     }
 
@@ -29,6 +60,11 @@ final class ClosedLidHelperClientTests: XCTestCase {
         service = nil
         defaults = nil
         suiteName = nil
+        reregistrationStatusResults = nil
+        reregistrationStopResults = nil
+        reregistrationStopTokens = nil
+        reregistrationStopReasons = nil
+        reregistrationEvents = nil
         super.tearDown()
     }
 
@@ -101,6 +137,59 @@ final class ClosedLidHelperClientTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: "closedLidHelperRegisteredGeneration"), "old-generation")
     }
 
+    func testReregisterStopsActiveOldHelperBeforeUnregistering() {
+        defaults.set("old-generation", forKey: "closedLidHelperRegisteredGeneration")
+        reregistrationStatusResults = [.active(.indefinite(token: "old-token"))]
+
+        let result = prepareForUse()
+
+        XCTAssertEqual(result, .ready)
+        XCTAssertEqual(reregistrationStopTokens, ["old-token"])
+        XCTAssertEqual(reregistrationStopReasons, ["helperReregistration"])
+        XCTAssertEqual(reregistrationEvents, ["status", "stop", "unregister", "register"])
+        XCTAssertEqual(service.unregisterCallCount, 1)
+        XCTAssertEqual(service.registerCallCount, 1)
+        XCTAssertNotEqual(defaults.string(forKey: "closedLidHelperRegisteredGeneration"), "old-generation")
+    }
+
+    func testReregisterBlocksWhenOldHelperStatusFails() {
+        defaults.set("old-generation", forKey: "closedLidHelperRegisteredGeneration")
+        reregistrationStatusResults = [.failure("xpc unavailable")]
+
+        let result = prepareForUse()
+
+        guard case .failure(let message) = result else {
+            XCTFail("Expected failure, got \(result)")
+            return
+        }
+        XCTAssertTrue(message.contains("could not verify old helper status"))
+        XCTAssertTrue(message.contains("sudo pmset -a disablesleep 0"))
+        XCTAssertEqual(reregistrationEvents, ["status"])
+        XCTAssertEqual(service.unregisterCallCount, 0)
+        XCTAssertEqual(service.registerCallCount, 0)
+        XCTAssertEqual(defaults.string(forKey: "closedLidHelperRegisteredGeneration"), "old-generation")
+    }
+
+    func testReregisterBlocksWhenActiveOldHelperCannotStop() {
+        defaults.set("old-generation", forKey: "closedLidHelperRegisteredGeneration")
+        reregistrationStatusResults = [.active(.indefinite(token: "old-token"))]
+        reregistrationStopResults = [.failure("restore failed")]
+
+        let result = prepareForUse()
+
+        guard case .failure(let message) = result else {
+            XCTFail("Expected failure, got \(result)")
+            return
+        }
+        XCTAssertTrue(message.contains("old helper stop failed"))
+        XCTAssertTrue(message.contains("sudo pmset -a disablesleep 0"))
+        XCTAssertEqual(reregistrationStopTokens, ["old-token"])
+        XCTAssertEqual(reregistrationEvents, ["status", "stop"])
+        XCTAssertEqual(service.unregisterCallCount, 0)
+        XCTAssertEqual(service.registerCallCount, 0)
+        XCTAssertEqual(defaults.string(forKey: "closedLidHelperRegisteredGeneration"), "old-generation")
+    }
+
     private func prepareForUse(
         file: StaticString = #filePath,
         line: UInt = #line
@@ -126,6 +215,7 @@ private final class FakeClosedLidService: ClosedLidServiceManaging {
     var status: SMAppService.Status
     var registerError: Error?
     var unregisterError: Error?
+    var eventRecorder: ((String) -> Void)?
 
     private(set) var registerCallCount = 0
     private(set) var unregisterCallCount = 0
@@ -136,6 +226,7 @@ private final class FakeClosedLidService: ClosedLidServiceManaging {
 
     func register() throws {
         registerCallCount += 1
+        eventRecorder?("register")
         if let registerError {
             throw registerError
         }
@@ -144,9 +235,22 @@ private final class FakeClosedLidService: ClosedLidServiceManaging {
 
     func unregister() throws {
         unregisterCallCount += 1
+        eventRecorder?("unregister")
         if let unregisterError {
             throw unregisterError
         }
         status = .notRegistered
+    }
+}
+
+private extension Array {
+    mutating func removeFirstOrDefault(_ defaultValue: Element) -> Element {
+        isEmpty ? defaultValue : removeFirst()
+    }
+}
+
+private extension ClosedLidHelperSession {
+    static func indefinite(token: String) -> ClosedLidHelperSession {
+        ClosedLidHelperSession(token: token, mode: .indefinite, endDate: nil)
     }
 }

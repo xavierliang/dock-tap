@@ -46,6 +46,13 @@ verify_launch_daemon_plist() {
         echo "LaunchDaemon MachServices missing $HELPER_MACH_SERVICE" >&2
         exit 1
     }
+
+    local keep_alive
+    keep_alive="$(plist_value ":KeepAlive" "$plist")"
+    [[ "$keep_alive" == "true" ]] || {
+        echo "LaunchDaemon KeepAlive must restart after non-crash exits" >&2
+        exit 1
+    }
 }
 
 cd "$ROOT"
