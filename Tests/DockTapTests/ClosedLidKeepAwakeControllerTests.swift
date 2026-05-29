@@ -113,6 +113,20 @@ final class ClosedLidKeepAwakeControllerTests: XCTestCase {
         XCTAssertEqual(controller.state, .error("helper start failed"))
     }
 
+    func testStartFailureWithActiveLeaseStopsImmediately() {
+        settingsStore.hasSeenClosedLidWarning = true
+        helperClient.startResults.append(.failedWithActiveSession(
+            .indefinite(token: "rollback-token"),
+            "pmset disablesleep 1 succeeded but restore failed"
+        ))
+
+        controller.enableIndefinitely()
+
+        XCTAssertEqual(helperClient.stopTokens, ["rollback-token"])
+        XCTAssertEqual(helperClient.stopReasons, ["startFailure"])
+        XCTAssertEqual(controller.state, .off)
+    }
+
     func testHelperApprovalRequiredStateOffersLoginItemsSettings() {
         settingsStore.hasSeenClosedLidWarning = true
         helperClient.prepareResults = [.requiresApproval]
@@ -194,6 +208,65 @@ final class ClosedLidKeepAwakeControllerTests: XCTestCase {
         XCTAssertEqual(completion?.success, true)
         XCTAssertNil(completion?.message)
         XCTAssertEqual(controller.state, .off)
+    }
+
+    func testStopBeforeTerminationDuringStartStopsLeaseFromFailedStartBeforeAllowingQuit() {
+        settingsStore.hasSeenClosedLidWarning = true
+
+        controller.enableForOneHour()
+
+        var completion: (success: Bool, message: String?)?
+        controller.stopBeforeTermination(reason: "update") { success, message in
+            completion = (success, message)
+        }
+
+        helperClient.completePendingStart(.failedWithActiveSession(
+            .indefinite(token: "rollback-token"),
+            "pmset disablesleep 1 succeeded but restore failed"
+        ))
+
+        XCTAssertEqual(helperClient.stopTokens, ["rollback-token"])
+        XCTAssertEqual(helperClient.stopReasons, ["update"])
+        XCTAssertEqual(completion?.success, true)
+        XCTAssertNil(completion?.message)
+        XCTAssertEqual(controller.state, .off)
+    }
+
+    func testStopBeforeTerminationDuringStartCancelsWhenFailedStartLeaseCannotBeStopped() {
+        settingsStore.hasSeenClosedLidWarning = true
+        helperClient.stopResults.append(.failure("restore still failed"))
+
+        controller.enableForOneHour()
+
+        var completion: (success: Bool, message: String?)?
+        controller.stopBeforeTermination(reason: "quit") { success, message in
+            completion = (success, message)
+        }
+
+        helperClient.completePendingStart(.failedWithActiveSession(
+            .indefinite(token: "rollback-token"),
+            "pmset disablesleep 1 succeeded but restore failed"
+        ))
+
+        XCTAssertEqual(helperClient.stopTokens, ["rollback-token"])
+        XCTAssertEqual(helperClient.stopReasons, ["quit"])
+        XCTAssertEqual(completion?.success, false)
+        XCTAssertEqual(completion?.message, "restore still failed")
+        XCTAssertEqual(controller.state, .stopFailed("restore still failed"))
+    }
+
+    func testRefreshStatusErrorWithActiveLeasePreservesStopNowToken() {
+        helperClient.statusResults.append(.failureWithActiveSession(
+            .indefinite(token: "status-token"),
+            "helper reports restore failed"
+        ))
+
+        controller.refreshStatus()
+        controller.stopNow()
+
+        XCTAssertEqual(controller.state, .off)
+        XCTAssertEqual(helperClient.stopTokens, ["status-token"])
+        XCTAssertEqual(helperClient.stopReasons, ["menu"])
     }
 
     private func XCTAssertActiveTimed(

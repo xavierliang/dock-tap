@@ -123,6 +123,12 @@ final class ClosedLidKeepAwakeController {
                 }
                 self.applyActiveSession(session)
                 self.logStore.append("closed-lid helper already active mode=\(session.logMode)")
+            case .failedWithActiveSession(let session, let message):
+                self.logStore.append("closed-lid start failed with active lease: \(message)")
+                if self.finishDeferredStopAfterStart(session) {
+                    return
+                }
+                self.stopAfterFailedStart(session)
             case .requiresApproval:
                 if self.stopRequestedDuringStart {
                     self.stopRequestedDuringStart = false
@@ -170,6 +176,9 @@ final class ClosedLidKeepAwakeController {
         case .active(let session):
             applyActiveSession(session)
             logStore.append("closed-lid helper status active mode=\(session.logMode)")
+        case .failureWithActiveSession(let session, let message):
+            applyActiveSessionError(session, message: message)
+            logStore.append("closed-lid status failed with active lease: \(message)")
         case .requiresApproval:
             clearActiveSession()
             state = .requiresApproval
@@ -191,6 +200,18 @@ final class ClosedLidKeepAwakeController {
         startRenewalTimer()
     }
 
+    private func applyActiveSessionError(_ session: ClosedLidHelperSession, message: String) {
+        activeToken = session.token
+        renewalTimer?.invalidate()
+        renewalTimer = nil
+        state = .errorWithActiveSession(message)
+    }
+
+    private func stopAfterFailedStart(_ session: ClosedLidHelperSession) {
+        activeToken = session.token
+        stopActiveSession(reason: "startFailure", showFailureAlert: true) { _, _ in }
+    }
+
     private func clearActiveSession() {
         activeToken = nil
         renewalTimer?.invalidate()
@@ -202,7 +223,7 @@ final class ClosedLidKeepAwakeController {
             return
         }
 
-        let timer = Timer.scheduledTimer(
+        let timer = Timer(
             timeInterval: ClosedLidIPCConstants.renewalIntervalSeconds,
             target: self,
             selector: #selector(renewLease),
@@ -210,6 +231,7 @@ final class ClosedLidKeepAwakeController {
             repeats: true
         )
         timer.tolerance = 5
+        RunLoop.main.add(timer, forMode: .common)
         renewalTimer = timer
     }
 
@@ -335,7 +357,7 @@ final class ClosedLidKeepAwakeController {
 
     private func armStopTimeout() {
         stopTimeoutTimer?.invalidate()
-        let timer = Timer.scheduledTimer(withTimeInterval: 15, repeats: false) { [weak self] _ in
+        let timer = Timer(timeInterval: 15, repeats: false) { [weak self] _ in
             guard let self, self.isStopInFlight else { return }
             self.completeStop(
                 success: false,
@@ -343,6 +365,7 @@ final class ClosedLidKeepAwakeController {
             )
         }
         timer.tolerance = 1
+        RunLoop.main.add(timer, forMode: .common)
         stopTimeoutTimer = timer
     }
 
@@ -429,6 +452,8 @@ private extension ClosedLidKeepAwakeState {
             return "requiresApproval"
         case .error:
             return "error"
+        case .errorWithActiveSession:
+            return "errorWithActiveSession"
         case .stopFailed:
             return "stopFailed"
         }

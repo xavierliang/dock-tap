@@ -1,4 +1,5 @@
 import DockTapClosedLidIPC
+import CryptoKit
 import Foundation
 import ServiceManagement
 
@@ -23,6 +24,7 @@ enum ClosedLidHelperPreparationResult: Equatable {
 enum ClosedLidHelperStartResult: Equatable {
     case started(ClosedLidHelperSession)
     case alreadyActive(ClosedLidHelperSession)
+    case failedWithActiveSession(ClosedLidHelperSession, String)
     case requiresApproval
     case failure(String)
 }
@@ -43,9 +45,18 @@ enum ClosedLidHelperStopResult: Equatable {
 enum ClosedLidHelperStatusResult: Equatable {
     case inactive
     case active(ClosedLidHelperSession)
+    case failureWithActiveSession(ClosedLidHelperSession, String)
     case requiresApproval
     case failure(String)
 }
+
+protocol ClosedLidServiceManaging: AnyObject {
+    var status: SMAppService.Status { get }
+    func register() throws
+    func unregister() throws
+}
+
+extension SMAppService: ClosedLidServiceManaging {}
 
 protocol ClosedLidHelperClienting: AnyObject {
     func prepareForUse(completion: @escaping (ClosedLidHelperPreparationResult) -> Void)
@@ -62,7 +73,7 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
     private static let helperExecutableName = "DockTapClosedLidHelper"
     private static let registeredGenerationKey = "closedLidHelperRegisteredGeneration"
 
-    private let service: SMAppService
+    private let service: any ClosedLidServiceManaging
     private let defaults: UserDefaults
     private let logStore: LogStore
     private let registrationQueue = DispatchQueue(label: "ai.resopod.docktap.closedlidhelper.registration")
@@ -70,7 +81,7 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
     private var connection: NSXPCConnection?
 
     init(
-        service: SMAppService = .daemon(plistName: ClosedLidHelperClient.daemonPlistName),
+        service: any ClosedLidServiceManaging = SMAppService.daemon(plistName: ClosedLidHelperClient.daemonPlistName),
         defaults: UserDefaults = .standard,
         logStore: LogStore
     ) {
@@ -127,6 +138,8 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
                 case .inactive:
                     completion(.stopped)
                 case .active(let session):
+                    self?.stop(token: session.token, reason: reason, completion: completion)
+                case .failureWithActiveSession(let session, _):
                     self?.stop(token: session.token, reason: reason, completion: completion)
                 case .requiresApproval:
                     completion(.requiresApproval)
@@ -219,13 +232,18 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
 
     private func reregisterHelper() -> ClosedLidHelperPreparationResult {
         do {
-            try? service.unregister()
+            try service.unregister()
+        } catch {
+            return .failure("helper re-registration failed while unregistering old helper: \(error.localizedDescription)")
+        }
+
+        do {
             try service.register()
             rememberRegisteredGeneration()
             logStore.append("closed-lid helper re-registered generation=\(bundledHelperGeneration)")
             return resultAfterRegistration()
         } catch {
-            return registrationFailureResult(error)
+            return registrationFailureResult(error, shouldAcceptAlreadyRegistered: false)
         }
     }
 
@@ -244,12 +262,18 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
         }
     }
 
-    private func registrationFailureResult(_ error: Error) -> ClosedLidHelperPreparationResult {
+    private func registrationFailureResult(
+        _ error: Error,
+        shouldAcceptAlreadyRegistered: Bool = true
+    ) -> ClosedLidHelperPreparationResult {
         let nsError = error as NSError
         if nsError.code == Int(kSMErrorLaunchDeniedByUser) {
             return .requiresApproval
         }
         if nsError.code == Int(kSMErrorAlreadyRegistered) {
+            guard shouldAcceptAlreadyRegistered else {
+                return .failure("helper re-registration failed: helper was still registered after unregister")
+            }
             rememberRegisteredGeneration()
             return resultAfterRegistration()
         }
@@ -286,14 +310,15 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
 
     private func fingerprint(_ url: URL) -> String {
         guard
-            let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
-            let size = attributes[.size] as? NSNumber
+            let data = try? Data(contentsOf: url, options: [.mappedIfSafe])
         else {
             return "\(url.lastPathComponent):missing"
         }
 
-        let modified = (attributes[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
-        return "\(url.lastPathComponent):\(size.int64Value):\(Int(modified))"
+        let digest = SHA256.hash(data: data)
+            .map { String(format: "%02x", $0) }
+            .joined()
+        return "\(url.lastPathComponent):sha256:\(digest)"
     }
 
     private func helperProxy(errorHandler: @escaping (Error) -> Void) -> ClosedLidHelperXPCProtocol? {
@@ -327,7 +352,7 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
         connection = newConnection
     }
 
-    private func startResult(from reply: ClosedLidStartReply) -> ClosedLidHelperStartResult {
+    func startResult(from reply: ClosedLidStartReply) -> ClosedLidHelperStartResult {
         let outcome = ClosedLidResponseOutcome(rawValue: reply.outcome as String)
         switch outcome {
         case .success:
@@ -342,6 +367,14 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
             return .alreadyActive(session)
         case .requiresApproval:
             return .requiresApproval
+        case .restoreFailed:
+            guard let session = session(from: reply) else {
+                return .failure(reply.errorMessage as String? ?? "helper start failed and normal sleep restore was not confirmed")
+            }
+            return .failedWithActiveSession(
+                session,
+                reply.errorMessage as String? ?? "helper start failed and normal sleep restore was not confirmed"
+            )
         default:
             return .failure(reply.errorMessage as String? ?? "helper start failed")
         }
@@ -375,7 +408,7 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
         }
     }
 
-    private func statusResult(from reply: ClosedLidStatusReply) -> ClosedLidHelperStatusResult {
+    func statusResult(from reply: ClosedLidStatusReply) -> ClosedLidHelperStatusResult {
         let state = ClosedLidStatusState(rawValue: reply.stateString as String)
         switch state {
         case .off:
@@ -388,7 +421,11 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
         case .requiresApproval:
             return .requiresApproval
         case .error:
-            return .failure(reply.errorMessage as String? ?? "helper status failed")
+            let message = reply.errorMessage as String? ?? "helper status failed"
+            if reply.isActive.boolValue, let session = session(from: reply) {
+                return .failureWithActiveSession(session, message)
+            }
+            return .failure(message)
         default:
             return .failure(reply.errorMessage as String? ?? "helper status was not recognized")
         }

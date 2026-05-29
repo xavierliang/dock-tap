@@ -179,20 +179,21 @@ enum ClosedLidKeepAwakeState: Equatable {
     case stopping
     case requiresApproval
     case error(String)
+    case errorWithActiveSession(String)
     case stopFailed(String)
 
     var canStartSession: Bool {
         switch self {
         case .off, .error:
             return true
-        case .starting, .activeTimed, .activeIndefinite, .stopping, .requiresApproval, .stopFailed:
+        case .starting, .activeTimed, .activeIndefinite, .stopping, .requiresApproval, .errorWithActiveSession, .stopFailed:
             return false
         }
     }
 
     var canStopSession: Bool {
         switch self {
-        case .activeTimed, .activeIndefinite, .starting, .stopFailed:
+        case .activeTimed, .activeIndefinite, .starting, .errorWithActiveSession, .stopFailed:
             return true
         case .off, .stopping, .requiresApproval, .error:
             return false
@@ -203,7 +204,7 @@ enum ClosedLidKeepAwakeState: Equatable {
         switch self {
         case .activeTimed, .activeIndefinite:
             return true
-        case .off, .starting, .stopping, .requiresApproval, .error, .stopFailed:
+        case .off, .starting, .stopping, .requiresApproval, .error, .errorWithActiveSession, .stopFailed:
             return false
         }
     }

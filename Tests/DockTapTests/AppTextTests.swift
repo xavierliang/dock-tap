@@ -50,6 +50,10 @@ final class AppTextTests: XCTestCase {
         XCTAssertEqual(AppText.ClosedLid.statusTitle(for: .requiresApproval), "Helper approval required")
         XCTAssertEqual(AppText.ClosedLid.statusTitle(for: .error("helper failed")), "Error: helper failed")
         XCTAssertTrue(
+            AppText.ClosedLid.statusTitle(for: .errorWithActiveSession("restore failed"))
+                .contains("sudo pmset -a disablesleep 0")
+        )
+        XCTAssertTrue(
             AppText.ClosedLid.statusTitle(for: .stopFailed("restore failed"))
                 .contains("sudo pmset -a disablesleep 0")
         )

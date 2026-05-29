@@ -163,6 +163,8 @@ enum AppText {
                 return helperApprovalRequired
             case .error(let message):
                 return error(message)
+            case .errorWithActiveSession(let message):
+                return stopFailed(message)
             case .stopFailed(let message):
                 return stopFailed(message)
             }

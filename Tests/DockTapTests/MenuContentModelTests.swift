@@ -251,11 +251,17 @@ final class MenuContentModelTests: XCTestCase {
 
     func testClosedLidMenuErrorAllowsRetryButStopFailureKeepsRecoveryAvailable() {
         let error = model(closedLidState: .error("helper unavailable")).closedLidMenu
+        let activeError = model(closedLidState: .errorWithActiveSession("restore failed")).closedLidMenu
         let stopFailed = model(closedLidState: .stopFailed("restore failed")).closedLidMenu
 
         XCTAssertEqual(error.statusTitle, "Error: helper unavailable")
         XCTAssertTrue(error.enableOneHourIsEnabled)
         XCTAssertFalse(error.stopNowIsEnabled)
+
+        XCTAssertTrue(activeError.statusTitle.contains("Error: restore failed."))
+        XCTAssertTrue(activeError.statusTitle.contains("sudo pmset -a disablesleep 0"))
+        XCTAssertFalse(activeError.enableOneHourIsEnabled)
+        XCTAssertTrue(activeError.stopNowIsEnabled)
 
         XCTAssertTrue(stopFailed.statusTitle.contains("Error: restore failed."))
         XCTAssertTrue(stopFailed.statusTitle.contains("sudo pmset -a disablesleep 0"))
