@@ -4,6 +4,7 @@ final class SettingsStore {
     private enum Keys {
         static let triggerModifierPreset = "triggerModifierPreset"
         static let windowActionsEnabled = "windowActionsEnabled"
+        static let hasSeenClosedLidWarning = "hasSeenClosedLidWarning"
     }
 
     private let defaults: UserDefaults
@@ -30,6 +31,15 @@ final class SettingsStore {
         }
         set {
             defaults.set(newValue, forKey: Keys.windowActionsEnabled)
+        }
+    }
+
+    var hasSeenClosedLidWarning: Bool {
+        get {
+            defaults.bool(forKey: Keys.hasSeenClosedLidWarning)
+        }
+        set {
+            defaults.set(newValue, forKey: Keys.hasSeenClosedLidWarning)
         }
     }
 }

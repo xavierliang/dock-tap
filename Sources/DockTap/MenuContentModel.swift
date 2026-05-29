@@ -1,4 +1,20 @@
+import Foundation
+
 struct MenuContentModel: Equatable {
+    struct ClosedLidMenu: Equatable {
+        let title: String
+        let statusTitle: String
+        let enableOneHourTitle: String
+        let enableOneHourIsEnabled: Bool
+        let enableOneHourIsChecked: Bool
+        let enableIndefinitelyTitle: String
+        let enableIndefinitelyIsEnabled: Bool
+        let enableIndefinitelyIsChecked: Bool
+        let stopNowTitle: String
+        let stopNowIsEnabled: Bool
+        let openApprovalSettingsTitle: String?
+    }
+
     struct MappingRow: Equatable {
         let shortcutIndex: Int
         let title: String
@@ -26,6 +42,7 @@ struct MenuContentModel: Equatable {
     let windowSnapToggleIsOn: Bool
     let windowSnapSubmenuTitle: String
     let windowSnapRows: [WindowSnapRow]
+    let closedLidMenu: ClosedLidMenu
     let updateDockShortcutsTitle: String
     let showLogsTitle: String
     let checkAccessibilityTitle: String?
@@ -42,6 +59,7 @@ struct MenuContentModel: Equatable {
         isAccessibilityTrusted: Bool,
         isEventTapReady: Bool,
         windowActionsEnabled: Bool,
+        closedLidState: ClosedLidKeepAwakeState = .off,
         appName: String,
         appVersion: String,
         availableUpdateVersion: String? = nil
@@ -80,6 +98,7 @@ struct MenuContentModel: Equatable {
         windowSnapToggleIsOn = windowActionsEnabled
         windowSnapSubmenuTitle = AppText.WindowSnap.submenuTitle
         windowSnapRows = Self.windowSnapRows(selectedPreset: selectedPreset)
+        closedLidMenu = Self.closedLidMenu(state: closedLidState)
         updateDockShortcutsTitle = AppText.Menu.updateDockShortcuts
         showLogsTitle = AppText.Menu.showLogs
         checkAccessibilityTitle = isAccessibilityTrusted ? nil : AppText.Menu.checkAccessibility
@@ -132,5 +151,71 @@ struct MenuContentModel: Equatable {
                 title: "\(selectedPreset.shortcutLabel(forKeyLabel: action.shortcutKeyLabel))  \(action.displayName)"
             )
         }
+    }
+
+    private static func closedLidMenu(state: ClosedLidKeepAwakeState) -> ClosedLidMenu {
+        let enableCommandsAreEnabled = state.canStartSession
+        return ClosedLidMenu(
+            title: AppText.ClosedLid.submenuTitle,
+            statusTitle: AppText.ClosedLid.statusTitle(for: state),
+            enableOneHourTitle: AppText.ClosedLid.enableOneHour,
+            enableOneHourIsEnabled: enableCommandsAreEnabled,
+            enableOneHourIsChecked: state.isTimed,
+            enableIndefinitelyTitle: AppText.ClosedLid.enableIndefinitely,
+            enableIndefinitelyIsEnabled: enableCommandsAreEnabled,
+            enableIndefinitelyIsChecked: state.isIndefinite,
+            stopNowTitle: AppText.ClosedLid.stopNow,
+            stopNowIsEnabled: state.canStopSession,
+            openApprovalSettingsTitle: state == .requiresApproval ? AppText.ClosedLid.openLoginItemsSettings : nil
+        )
+    }
+}
+
+enum ClosedLidKeepAwakeState: Equatable {
+    case off
+    case starting
+    case activeTimed(endDate: Date)
+    case activeIndefinite
+    case stopping
+    case requiresApproval
+    case error(String)
+    case stopFailed(String)
+
+    var canStartSession: Bool {
+        switch self {
+        case .off, .error:
+            return true
+        case .starting, .activeTimed, .activeIndefinite, .stopping, .requiresApproval, .stopFailed:
+            return false
+        }
+    }
+
+    var canStopSession: Bool {
+        switch self {
+        case .activeTimed, .activeIndefinite, .starting, .stopFailed:
+            return true
+        case .off, .stopping, .requiresApproval, .error:
+            return false
+        }
+    }
+
+    var isActive: Bool {
+        switch self {
+        case .activeTimed, .activeIndefinite:
+            return true
+        case .off, .starting, .stopping, .requiresApproval, .error, .stopFailed:
+            return false
+        }
+    }
+
+    var isTimed: Bool {
+        if case .activeTimed = self {
+            return true
+        }
+        return false
+    }
+
+    var isIndefinite: Bool {
+        self == .activeIndefinite
     }
 }

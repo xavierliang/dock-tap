@@ -93,6 +93,126 @@ enum AppText {
             "windowSnap.center", value: "Center", comment: "Window snap action")
     }
 
+    enum ClosedLid {
+        static let submenuTitle = NSLocalizedString(
+            "closedLid.submenu", value: "Closed-Lid Keep Awake", comment: "Menu submenu title")
+        static let off = NSLocalizedString(
+            "closedLid.status.off", value: "Off", comment: "Closed-lid keep-awake status")
+        static let starting = NSLocalizedString(
+            "closedLid.status.starting", value: "Starting…", comment: "Closed-lid keep-awake status")
+        static let stopping = NSLocalizedString(
+            "closedLid.status.stopping", value: "Stopping…", comment: "Closed-lid keep-awake status")
+        static let onIndefinitely = NSLocalizedString(
+            "closedLid.status.onIndefinitely", value: "On indefinitely",
+            comment: "Closed-lid keep-awake status")
+        static let helperApprovalRequired = NSLocalizedString(
+            "closedLid.status.helperApprovalRequired", value: "Helper approval required",
+            comment: "Closed-lid keep-awake status")
+        static let helperApprovalBody = NSLocalizedString(
+            "closedLid.helperApproval.body",
+            value: "Approve Dock Tap Closed-Lid Helper in System Settings > General > Login Items & Extensions.",
+            comment: "Closed-lid helper approval guidance")
+        static let enableOneHour = NSLocalizedString(
+            "closedLid.enableOneHour", value: "Enable for 1 Hour", comment: "Closed-lid menu command")
+        static let enableIndefinitely = NSLocalizedString(
+            "closedLid.enableIndefinitely", value: "Enable Indefinitely",
+            comment: "Closed-lid menu command")
+        static let stopNow = NSLocalizedString(
+            "closedLid.stopNow", value: "Stop Now", comment: "Closed-lid menu command")
+        static let openLoginItemsSettings = NSLocalizedString(
+            "closedLid.openLoginItemsSettings", value: "Open Login Items Settings...",
+            comment: "Closed-lid menu command")
+        static let warningTitle = NSLocalizedString(
+            "closedLid.warning.title", value: "Enable Closed-Lid Keep Awake?",
+            comment: "Closed-lid first-use warning title")
+        static let warningBody = NSLocalizedString(
+            "closedLid.warning.body",
+            value: "This changes your Mac's normal lid-sleep behavior by setting pmset disablesleep. It can increase battery drain and heat. Use it only on a ventilated surface, and stop it any time from the Dock Tap menu.",
+            comment: "Closed-lid first-use warning body")
+        static let warningContinue = NSLocalizedString(
+            "closedLid.warning.continue", value: "Continue", comment: "Closed-lid warning button")
+        static let warningCancel = NSLocalizedString(
+            "closedLid.warning.cancel", value: "Cancel", comment: "Closed-lid warning button")
+        static let stopFailureTitle = NSLocalizedString(
+            "closedLid.stopFailure.title", value: "Closed-Lid Keep Awake Could Not Stop",
+            comment: "Closed-lid stop failure alert title")
+        static let manualRecovery = NSLocalizedString(
+            "closedLid.manualRecovery", value: "Run sudo pmset -a disablesleep 0 to restore normal lid sleep.",
+            comment: "Closed-lid manual recovery guidance")
+        static let updateBlockedTitle = NSLocalizedString(
+            "closedLid.updateBlocked.title", value: "Update Blocked",
+            comment: "Closed-lid Sparkle update block title")
+        static let updateBlockedBody = NSLocalizedString(
+            "closedLid.updateBlocked.body",
+            value: "Dock Tap could not confirm that closed-lid keep awake was stopped, so the update was not installed.",
+            comment: "Closed-lid Sparkle update block body")
+
+        static func statusTitle(for state: ClosedLidKeepAwakeState) -> String {
+            switch state {
+            case .off:
+                return off
+            case .starting:
+                return starting
+            case .activeTimed(let endDate):
+                return onUntil(time: DateFormatter.localizedString(from: endDate, dateStyle: .none, timeStyle: .short))
+            case .activeIndefinite:
+                return onIndefinitely
+            case .stopping:
+                return stopping
+            case .requiresApproval:
+                return helperApprovalRequired
+            case .error(let message):
+                return error(message)
+            case .stopFailed(let message):
+                return stopFailed(message)
+            }
+        }
+
+        static func onUntil(time: String) -> String {
+            String(
+                format: NSLocalizedString(
+                    "closedLid.status.onUntil", value: "On until %@",
+                    comment: "Closed-lid timed keep-awake status"),
+                time)
+        }
+
+        static func error(_ message: String) -> String {
+            String(
+                format: NSLocalizedString(
+                    "closedLid.status.error", value: "Error: %@",
+                    comment: "Closed-lid helper error status"),
+                shortMessage(message))
+        }
+
+        static func stopFailed(_ message: String) -> String {
+            String(
+                format: NSLocalizedString(
+                    "closedLid.status.stopFailed", value: "Error: %@. %@",
+                    comment: "Closed-lid stop failure status"),
+                shortMessage(message),
+                manualRecovery)
+        }
+
+        static func stopFailureBody(_ message: String) -> String {
+            String(
+                format: NSLocalizedString(
+                    "closedLid.stopFailure.body", value: "%@\n\n%@",
+                    comment: "Closed-lid stop failure alert body"),
+                shortMessage(message),
+                manualRecovery)
+        }
+
+        private static func shortMessage(_ message: String) -> String {
+            let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.count > 90 else {
+                return trimmed.isEmpty ? NSLocalizedString(
+                    "closedLid.error.unknown", value: "Unknown error",
+                    comment: "Closed-lid fallback error") : trimmed
+            }
+            return "\(trimmed.prefix(87))..."
+        }
+    }
+
     enum LoginItem {
         static let launchAtLogin = NSLocalizedString(
             "loginItem.launchAtLogin", value: "Launch at Login", comment: "Menu toggle")

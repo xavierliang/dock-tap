@@ -32,6 +32,32 @@
 "windowSnap.maximize" = "最大化";
 "windowSnap.center" = "居中";
 
+/* Closed-lid keep awake */
+"closedLid.submenu" = "合盖保持唤醒";
+"closedLid.status.off" = "已关闭";
+"closedLid.status.starting" = "正在开启…";
+"closedLid.status.stopping" = "正在停止…";
+"closedLid.status.onUntil" = "开启至 %@";
+"closedLid.status.onIndefinitely" = "无限期开启";
+"closedLid.status.helperApprovalRequired" = "需要批准辅助程序";
+"closedLid.helperApproval.body" = "请在「系统设置 > 通用 > 登录项与扩展」中批准 Dock Tap 合盖辅助程序。";
+"closedLid.status.error" = "错误：%@";
+"closedLid.status.stopFailed" = "错误：%@。%@";
+"closedLid.enableOneHour" = "开启 1 小时";
+"closedLid.enableIndefinitely" = "无限期开启";
+"closedLid.stopNow" = "立即停止";
+"closedLid.openLoginItemsSettings" = "打开登录项设置...";
+"closedLid.warning.title" = "开启合盖保持唤醒？";
+"closedLid.warning.body" = "这会通过设置 pmset disablesleep 改变 Mac 正常的合盖睡眠行为，可能增加电池消耗和发热。请只在通风表面上使用，并可随时从 Dock Tap 菜单停止。";
+"closedLid.warning.continue" = "继续";
+"closedLid.warning.cancel" = "取消";
+"closedLid.stopFailure.title" = "无法停止合盖保持唤醒";
+"closedLid.stopFailure.body" = "%@\n\n%@";
+"closedLid.manualRecovery" = "运行 sudo pmset -a disablesleep 0 以恢复正常合盖睡眠。";
+"closedLid.updateBlocked.title" = "更新已阻止";
+"closedLid.updateBlocked.body" = "Dock Tap 无法确认合盖保持唤醒已停止，因此未安装更新。";
+"closedLid.error.unknown" = "未知错误";
+
 /* Launch at login */
 "loginItem.launchAtLogin" = "登录时启动";
 "loginItem.requiresApproval" = "登录时启动（需批准）";

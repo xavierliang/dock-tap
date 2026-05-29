@@ -9,10 +9,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let dockSlotStore = DockSlotStore()
     private lazy var appActivator = AppActivator(logStore: logStore)
     private lazy var windowActor = WindowActor(logStore: logStore)
+    private lazy var closedLidController: ClosedLidKeepAwakeController = {
+        let controller = ClosedLidKeepAwakeController(
+            settingsStore: settingsStore,
+            helperClient: ClosedLidHelperClient(logStore: logStore),
+            logStore: logStore
+        )
+        controller.onStateChanged = { [weak self] in
+            self?.rebuildMenu()
+        }
+        return controller
+    }()
     private lazy var updateController: UpdateController = {
         let controller = UpdateController(logStore: logStore)
         controller.onAvailabilityChanged = { [weak self] in
             self?.rebuildMenu()
+        }
+        controller.stopBeforeUpdate = { [weak self] completion in
+            guard let self else {
+                completion(true)
+                return
+            }
+            self.closedLidController.stopBeforeTermination(reason: "sparkle-update") { success, _ in
+                completion(success)
+            }
         }
         return controller
     }()
@@ -26,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var selectedTriggerModifierPreset = TriggerModifierPreset.defaultPreset
     private var windowActionsEnabled = false
     private var lastLoginItemFailure: String?
+    private var isTerminationGatePending = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -55,12 +76,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         startHealthReconcileTimer()
         reconcilePermissionAndTapHealth(prompt: true, reason: "launch")
         _ = updateController
+        closedLidController.refreshStatus()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         healthReconcileTimer?.invalidate()
+        closedLidController.invalidate()
         activeAppProvider.stop()
         eventTapController?.stop()
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard closedLidController.requiresStopGate else {
+            return .terminateNow
+        }
+
+        guard !isTerminationGatePending else {
+            return .terminateLater
+        }
+
+        isTerminationGatePending = true
+        closedLidController.stopBeforeTermination(reason: "quit") { [weak self] success, _ in
+            self?.isTerminationGatePending = false
+            sender.reply(toApplicationShouldTerminate: success)
+        }
+        return .terminateLater
     }
 
     @objc private func showLogs() {
@@ -85,6 +125,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func checkForUpdatesFromMenu() {
         updateController.checkForUpdates()
+    }
+
+    @objc private func enableClosedLidForOneHour() {
+        closedLidController.enableForOneHour()
+    }
+
+    @objc private func enableClosedLidIndefinitely() {
+        closedLidController.enableIndefinitely()
+    }
+
+    @objc private func stopClosedLidNow() {
+        closedLidController.stopNow()
+    }
+
+    @objc private func openClosedLidApprovalSettings() {
+        closedLidController.openApprovalSettings()
     }
 
     @objc private func selectTriggerModifierPreset(_ sender: NSMenuItem) {
@@ -262,6 +318,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             isAccessibilityTrusted: isAccessibilityTrusted,
             isEventTapReady: eventTapController?.isReady == true,
             windowActionsEnabled: windowActionsEnabled,
+            closedLidState: closedLidController.state,
             appName: appName,
             appVersion: appVersion,
             availableUpdateVersion: updateController.availableUpdateVersion
@@ -282,6 +339,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         windowSnapItem.state = menuModel.windowSnapToggleIsOn ? .on : .off
         statusMenu.addItem(windowSnapItem)
         statusMenu.addItem(windowSnapMenuItem(menuModel))
+        statusMenu.addItem(closedLidMenuItem(menuModel))
         statusMenu.addItem(.separator())
 
         let loginItem = commandItem(title: loginMenuModel.title, action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
@@ -327,6 +385,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         for row in menuModel.windowSnapRows {
             submenu.addItem(disabledItem(row.title))
         }
+        item.submenu = submenu
+        return item
+    }
+
+    private func closedLidMenuItem(_ menuModel: MenuContentModel) -> NSMenuItem {
+        let model = menuModel.closedLidMenu
+        let item = NSMenuItem(title: model.title, action: nil, keyEquivalent: "")
+        let submenu = NSMenu(title: model.title)
+
+        submenu.addItem(disabledItem(model.statusTitle))
+        submenu.addItem(.separator())
+
+        let oneHourItem = commandItem(
+            title: model.enableOneHourTitle,
+            action: #selector(enableClosedLidForOneHour),
+            keyEquivalent: ""
+        )
+        oneHourItem.isEnabled = model.enableOneHourIsEnabled
+        oneHourItem.state = model.enableOneHourIsChecked ? .on : .off
+        submenu.addItem(oneHourItem)
+
+        let indefiniteItem = commandItem(
+            title: model.enableIndefinitelyTitle,
+            action: #selector(enableClosedLidIndefinitely),
+            keyEquivalent: ""
+        )
+        indefiniteItem.isEnabled = model.enableIndefinitelyIsEnabled
+        indefiniteItem.state = model.enableIndefinitelyIsChecked ? .on : .off
+        submenu.addItem(indefiniteItem)
+
+        let stopItem = commandItem(
+            title: model.stopNowTitle,
+            action: #selector(stopClosedLidNow),
+            keyEquivalent: ""
+        )
+        stopItem.isEnabled = model.stopNowIsEnabled
+        submenu.addItem(stopItem)
+
+        if let title = model.openApprovalSettingsTitle {
+            submenu.addItem(.separator())
+            submenu.addItem(commandItem(
+                title: title,
+                action: #selector(openClosedLidApprovalSettings),
+                keyEquivalent: ""
+            ))
+        }
+
         item.submenu = submenu
         return item
     }

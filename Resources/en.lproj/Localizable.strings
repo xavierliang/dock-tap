@@ -32,6 +32,32 @@
 "windowSnap.maximize" = "Maximize";
 "windowSnap.center" = "Center";
 
+/* Closed-lid keep awake */
+"closedLid.submenu" = "Closed-Lid Keep Awake";
+"closedLid.status.off" = "Off";
+"closedLid.status.starting" = "Starting…";
+"closedLid.status.stopping" = "Stopping…";
+"closedLid.status.onUntil" = "On until %@";
+"closedLid.status.onIndefinitely" = "On indefinitely";
+"closedLid.status.helperApprovalRequired" = "Helper approval required";
+"closedLid.helperApproval.body" = "Approve Dock Tap Closed-Lid Helper in System Settings > General > Login Items & Extensions.";
+"closedLid.status.error" = "Error: %@";
+"closedLid.status.stopFailed" = "Error: %@. %@";
+"closedLid.enableOneHour" = "Enable for 1 Hour";
+"closedLid.enableIndefinitely" = "Enable Indefinitely";
+"closedLid.stopNow" = "Stop Now";
+"closedLid.openLoginItemsSettings" = "Open Login Items Settings...";
+"closedLid.warning.title" = "Enable Closed-Lid Keep Awake?";
+"closedLid.warning.body" = "This changes your Mac's normal lid-sleep behavior by setting pmset disablesleep. It can increase battery drain and heat. Use it only on a ventilated surface, and stop it any time from the Dock Tap menu.";
+"closedLid.warning.continue" = "Continue";
+"closedLid.warning.cancel" = "Cancel";
+"closedLid.stopFailure.title" = "Closed-Lid Keep Awake Could Not Stop";
+"closedLid.stopFailure.body" = "%@\n\n%@";
+"closedLid.manualRecovery" = "Run sudo pmset -a disablesleep 0 to restore normal lid sleep.";
+"closedLid.updateBlocked.title" = "Update Blocked";
+"closedLid.updateBlocked.body" = "Dock Tap could not confirm that closed-lid keep awake was stopped, so the update was not installed.";
+"closedLid.error.unknown" = "Unknown error";
+
 /* Launch at login */
 "loginItem.launchAtLogin" = "Launch at Login";
 "loginItem.requiresApproval" = "Launch at Login (Requires Approval)";
