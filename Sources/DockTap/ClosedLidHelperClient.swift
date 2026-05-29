@@ -398,6 +398,7 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
     ) -> ClosedLidHelperPreparationResult {
         let nsError = error as NSError
         if nsError.code == Int(kSMErrorLaunchDeniedByUser) {
+            rememberRegisteredGeneration()
             return .requiresApproval
         }
         if nsError.code == Int(kSMErrorAlreadyRegistered) {

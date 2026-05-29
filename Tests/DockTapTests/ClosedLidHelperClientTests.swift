@@ -124,6 +124,14 @@ final class ClosedLidHelperClientTests: XCTestCase {
         assertPrepareRemembersGenerationWhenRegistrationRequiresApprovalThenApproved(initialStatus: .notRegistered)
     }
 
+    func testPrepareRemembersGenerationWhenNotFoundRegistrationThrowsLaunchDeniedThenApproved() {
+        assertPrepareRemembersGenerationWhenRegistrationThrowsLaunchDeniedThenApproved(initialStatus: .notFound)
+    }
+
+    func testPrepareRemembersGenerationWhenNotRegisteredRegistrationThrowsLaunchDeniedThenApproved() {
+        assertPrepareRemembersGenerationWhenRegistrationThrowsLaunchDeniedThenApproved(initialStatus: .notRegistered)
+    }
+
     func testPrepareReturnsNotFoundAfterRegisterWhenStatusRemainsNotFound() {
         service.status = .notFound
         service.statusAfterRegister = .notFound
@@ -255,6 +263,35 @@ final class ClosedLidHelperClientTests: XCTestCase {
         let rememberedGeneration = defaults.string(forKey: "closedLidHelperRegisteredGeneration")
         XCTAssertNotNil(rememberedGeneration, file: file, line: line)
 
+        service.status = .enabled
+        reregistrationEvents = []
+
+        let secondResult = prepareForUse(file: file, line: line)
+
+        XCTAssertEqual(secondResult, .ready, file: file, line: line)
+        XCTAssertEqual(service.registerCallCount, 1, file: file, line: line)
+        XCTAssertEqual(service.unregisterCallCount, 0, file: file, line: line)
+        XCTAssertEqual(reregistrationEvents, [], file: file, line: line)
+        XCTAssertEqual(defaults.string(forKey: "closedLidHelperRegisteredGeneration"), rememberedGeneration, file: file, line: line)
+    }
+
+    private func assertPrepareRemembersGenerationWhenRegistrationThrowsLaunchDeniedThenApproved(
+        initialStatus: SMAppService.Status,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        service.status = initialStatus
+        service.registerError = NSError(domain: "DockTapTests", code: Int(kSMErrorLaunchDeniedByUser))
+
+        let firstResult = prepareForUse(file: file, line: line)
+
+        XCTAssertEqual(firstResult, .requiresApproval, file: file, line: line)
+        XCTAssertEqual(service.registerCallCount, 1, file: file, line: line)
+        XCTAssertEqual(service.unregisterCallCount, 0, file: file, line: line)
+        let rememberedGeneration = defaults.string(forKey: "closedLidHelperRegisteredGeneration")
+        XCTAssertNotNil(rememberedGeneration, file: file, line: line)
+
+        service.registerError = nil
         service.status = .enabled
         reregistrationEvents = []
 
