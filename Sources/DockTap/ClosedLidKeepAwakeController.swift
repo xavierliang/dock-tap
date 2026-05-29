@@ -6,6 +6,7 @@ final class ClosedLidKeepAwakeController {
     private enum ApprovalFollowUp {
         static let maxAttempts = 60
         static let retryInterval: TimeInterval = 1
+        static let prepareTimeout: TimeInterval = 60
     }
 
     var onStateChanged: (() -> Void)?
@@ -25,9 +26,13 @@ final class ClosedLidKeepAwakeController {
     private let helperClient: ClosedLidHelperClienting
     private let logStore: LogStore
     private let displaySleepController: ClosedLidDisplaySleepControlling
+    private let approvalFollowUpMaxAttempts: Int
+    private let approvalFollowUpRetryInterval: TimeInterval
+    private let approvalFollowUpPrepareTimeout: TimeInterval
 
     private var renewalTimer: Timer?
     private var stopTimeoutTimer: Timer?
+    private var approvalFollowUpTimeoutTimer: Timer?
     private var activeToken: String?
     private var pendingStopCompletions: [(Bool, String?) -> Void] = []
     private var isStopInFlight = false
@@ -43,19 +48,25 @@ final class ClosedLidKeepAwakeController {
     private var approvalAlertShownForCurrentStart = false
 
     var requiresStopGate: Bool {
-        state.canStopSession || isStopInFlight
+        state.canStopSession || isStopInFlight || hasPendingApprovalFollowUpStart
     }
 
     init(
         settingsStore: SettingsStore,
         helperClient: ClosedLidHelperClienting,
         logStore: LogStore,
-        displaySleepController: ClosedLidDisplaySleepControlling? = nil
+        displaySleepController: ClosedLidDisplaySleepControlling? = nil,
+        approvalFollowUpMaxAttempts: Int = ApprovalFollowUp.maxAttempts,
+        approvalFollowUpRetryInterval: TimeInterval = ApprovalFollowUp.retryInterval,
+        approvalFollowUpPrepareTimeout: TimeInterval = ApprovalFollowUp.prepareTimeout
     ) {
         self.settingsStore = settingsStore
         self.helperClient = helperClient
         self.logStore = logStore
         self.displaySleepController = displaySleepController ?? ClosedLidDisplaySleepController(logStore: logStore)
+        self.approvalFollowUpMaxAttempts = approvalFollowUpMaxAttempts
+        self.approvalFollowUpRetryInterval = approvalFollowUpRetryInterval
+        self.approvalFollowUpPrepareTimeout = approvalFollowUpPrepareTimeout
     }
 
     func refreshStatus() {
@@ -84,7 +95,7 @@ final class ClosedLidKeepAwakeController {
     }
 
     func stopBeforeTermination(reason: String, completion: @escaping (Bool, String?) -> Void) {
-        guard state.canStopSession || isStopInFlight else {
+        guard state.canStopSession || isStopInFlight || hasPendingApprovalFollowUpStart else {
             completion(true, nil)
             return
         }
@@ -115,6 +126,7 @@ final class ClosedLidKeepAwakeController {
             return
         }
 
+        approvalFollowUpAttemptsRemaining = approvalFollowUpMaxAttempts
         state = .starting
         approvalAlertShownForCurrentStart = false
         logStore.append("closed-lid start requested mode=\(logMode)")
@@ -222,6 +234,10 @@ final class ClosedLidKeepAwakeController {
             && state != .stopping
     }
 
+    private var hasPendingApprovalFollowUpStart: Bool {
+        activeApprovalFollowUpGeneration != nil
+    }
+
     private func applyStatus(_ result: ClosedLidHelperStatusResult) {
         switch result {
         case .inactive:
@@ -277,16 +293,16 @@ final class ClosedLidKeepAwakeController {
     }
 
     private func beginApprovalFollowUp(duration: TimeInterval?) {
-        cancelApprovalFollowUp()
+        cancelApprovalFollowUp(resetBudget: false)
         approvalFollowUpGeneration += 1
         activeApprovalFollowUpGeneration = approvalFollowUpGeneration
         approvalFollowUpDuration = duration
-        approvalFollowUpAttemptsRemaining = ApprovalFollowUp.maxAttempts
 
         clearActiveSession()
         state = .requiresApproval
         logStore.append("closed-lid helper requires approval")
         showApprovalRequiredAlertIfNeeded()
+        armApprovalFollowUpTimeout(generation: approvalFollowUpGeneration)
         pollApprovalFollowUp(generation: approvalFollowUpGeneration)
     }
 
@@ -322,7 +338,7 @@ final class ClosedLidKeepAwakeController {
         switch result {
         case .ready:
             let duration = approvalFollowUpDuration
-            cancelApprovalFollowUp()
+            cancelApprovalFollowUp(resetBudget: false)
             state = .starting
             logStore.append("closed-lid helper approval confirmed; starting requested session")
             startPreparedSession(duration: duration)
@@ -353,12 +369,22 @@ final class ClosedLidKeepAwakeController {
         }
 
         approvalFollowUpTimer?.invalidate()
-        let timer = Timer(timeInterval: ApprovalFollowUp.retryInterval, repeats: false) { [weak self] _ in
+        let timer = Timer(timeInterval: approvalFollowUpRetryInterval, repeats: false) { [weak self] _ in
             self?.pollApprovalFollowUp(generation: generation)
         }
-        timer.tolerance = 0.25
+        timer.tolerance = min(0.25, approvalFollowUpRetryInterval / 4)
         RunLoop.main.add(timer, forMode: .common)
         approvalFollowUpTimer = timer
+    }
+
+    private func armApprovalFollowUpTimeout(generation: Int) {
+        approvalFollowUpTimeoutTimer?.invalidate()
+        let timer = Timer(timeInterval: approvalFollowUpPrepareTimeout, repeats: false) { [weak self] _ in
+            self?.completeApprovalFollowUpTimedOut(generation: generation)
+        }
+        timer.tolerance = min(1, approvalFollowUpPrepareTimeout / 10)
+        RunLoop.main.add(timer, forMode: .common)
+        approvalFollowUpTimeoutTimer = timer
     }
 
     private func completeApprovalFollowUpTimedOut(generation: Int) {
@@ -371,13 +397,18 @@ final class ClosedLidKeepAwakeController {
         logStore.append("closed-lid helper approval follow-up stopped before approval was confirmed")
     }
 
-    private func cancelApprovalFollowUp() {
+    private func cancelApprovalFollowUp(resetBudget: Bool = true) {
         approvalFollowUpTimer?.invalidate()
         approvalFollowUpTimer = nil
+        approvalFollowUpTimeoutTimer?.invalidate()
+        approvalFollowUpTimeoutTimer = nil
         approvalFollowUpDuration = nil
-        approvalFollowUpAttemptsRemaining = 0
         approvalFollowUpPrepareInFlight = false
         activeApprovalFollowUpGeneration = nil
+        if resetBudget {
+            approvalFollowUpAttemptsRemaining = 0
+            approvalAlertShownForCurrentStart = false
+        }
     }
 
     private func startRenewalTimer() {
@@ -432,6 +463,11 @@ final class ClosedLidKeepAwakeController {
     ) {
         pendingStopCompletions.append(completion)
         stopFailureAlertRequested = stopFailureAlertRequested || showFailureAlert
+
+        if hasPendingApprovalFollowUpStart, activeToken == nil {
+            cancelPendingApprovalFollowUpStart(reason: reason)
+            return
+        }
 
         if case .starting = state, activeToken == nil {
             deferStopUntilStartCompletes(reason: reason)
@@ -568,6 +604,15 @@ final class ClosedLidKeepAwakeController {
         timer.tolerance = 1
         RunLoop.main.add(timer, forMode: .common)
         stopTimeoutTimer = timer
+    }
+
+    private func cancelPendingApprovalFollowUpStart(reason: String) {
+        isStopInFlight = true
+        activeStopReason = reason
+        cancelApprovalFollowUp()
+        clearActiveSession()
+        logStore.append("closed-lid pending approval follow-up canceled reason=\(reason)")
+        completeStop(success: true, message: nil)
     }
 
     private func completeStop(success: Bool, message: String?) {

@@ -190,6 +190,81 @@ final class ClosedLidKeepAwakeControllerTests: XCTestCase {
         XCTAssertActiveTimed(endDate, controller.state)
     }
 
+    func testStopBeforeTerminationCancelsPendingApprovalFollowUpBeforeItCanStart() {
+        settingsStore.hasSeenClosedLidWarning = true
+        helperClient.prepareResults = [.requiresApproval]
+
+        controller.enableForOneHour()
+        XCTAssertEqual(controller.state, .requiresApproval)
+        XCTAssertTrue(controller.requiresStopGate)
+
+        var completion: (success: Bool, message: String?)?
+        controller.stopBeforeTermination(reason: "update") { success, message in
+            completion = (success, message)
+        }
+
+        XCTAssertEqual(completion?.success, true)
+        XCTAssertNil(completion?.message)
+        XCTAssertEqual(controller.state, .off)
+        XCTAssertFalse(controller.requiresStopGate)
+
+        helperClient.completePendingPrepare(.ready)
+
+        XCTAssertTrue(helperClient.startDurations.isEmpty)
+        XCTAssertTrue(helperClient.stopTokens.isEmpty)
+    }
+
+    func testApprovalFollowUpBudgetDoesNotResetAcrossStartRequiresApprovalCycles() {
+        recreateController(approvalFollowUpMaxAttempts: 2)
+        settingsStore.hasSeenClosedLidWarning = true
+        helperClient.prepareResults = [.ready, .ready, .ready]
+        helperClient.startResults = [.requiresApproval, .requiresApproval, .requiresApproval]
+
+        controller.enableForOneHour()
+
+        XCTAssertEqual(helperClient.prepareCallCount, 3)
+        XCTAssertEqual(helperClient.startDurations.count, 3)
+        XCTAssertEqual(helperClient.startDurations[0], 3_600)
+        XCTAssertEqual(helperClient.startDurations[1], 3_600)
+        XCTAssertEqual(helperClient.startDurations[2], 3_600)
+        XCTAssertEqual(controller.state, .requiresApproval)
+        XCTAssertFalse(controller.requiresStopGate)
+        XCTAssertEqual(helperClient.openApprovalSettingsCallCount, 1)
+        XCTAssertEqual(AlertRunModalStub.alerts.map(\.messageText), [AppText.ClosedLid.helperApprovalRequired])
+    }
+
+    func testApprovalFollowUpRequiresApprovalRetryExhaustionStopsPendingGate() {
+        recreateController(approvalFollowUpMaxAttempts: 1)
+        settingsStore.hasSeenClosedLidWarning = true
+        helperClient.prepareResults = [.requiresApproval, .requiresApproval]
+
+        controller.enableForOneHour()
+
+        XCTAssertEqual(helperClient.prepareCallCount, 2)
+        XCTAssertTrue(helperClient.startDurations.isEmpty)
+        XCTAssertEqual(controller.state, .requiresApproval)
+        XCTAssertFalse(controller.requiresStopGate)
+        XCTAssertEqual(AlertRunModalStub.alerts.map(\.messageText), [AppText.ClosedLid.helperApprovalRequired])
+    }
+
+    func testApprovalFollowUpHungPrepareTimesOutAndCannotLaterStart() {
+        recreateController(approvalFollowUpPrepareTimeout: 0.01)
+        settingsStore.hasSeenClosedLidWarning = true
+        helperClient.prepareResults = [.requiresApproval]
+
+        controller.enableForOneHour()
+        XCTAssertEqual(controller.state, .requiresApproval)
+        XCTAssertTrue(controller.requiresStopGate)
+
+        runMainRunLoop(until: { !controller.requiresStopGate })
+        XCTAssertEqual(controller.state, .requiresApproval)
+        XCTAssertFalse(controller.requiresStopGate)
+
+        helperClient.completePendingPrepare(.ready)
+
+        XCTAssertTrue(helperClient.startDurations.isEmpty)
+    }
+
     func testRefreshStatusMirrorsActiveAndInactiveHelperStates() {
         let endDate = Date(timeIntervalSinceReferenceDate: 10_000)
         helperClient.statusResults.append(.active(.timed(token: "status-token", endDate: endDate)))
@@ -420,6 +495,37 @@ final class ClosedLidKeepAwakeControllerTests: XCTestCase {
         }
 
         XCTAssertEqual(actualEndDate, expectedEndDate, file: file, line: line)
+    }
+
+    private func recreateController(
+        approvalFollowUpMaxAttempts: Int = 60,
+        approvalFollowUpRetryInterval: TimeInterval = 1,
+        approvalFollowUpPrepareTimeout: TimeInterval = 60
+    ) {
+        controller.invalidate()
+        displaySleepController = FakeClosedLidDisplaySleepController()
+        controller = ClosedLidKeepAwakeController(
+            settingsStore: settingsStore,
+            helperClient: helperClient,
+            logStore: logStore,
+            displaySleepController: displaySleepController,
+            approvalFollowUpMaxAttempts: approvalFollowUpMaxAttempts,
+            approvalFollowUpRetryInterval: approvalFollowUpRetryInterval,
+            approvalFollowUpPrepareTimeout: approvalFollowUpPrepareTimeout
+        )
+    }
+
+    private func runMainRunLoop(
+        until condition: () -> Bool,
+        timeout: TimeInterval = 0.5,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let deadline = Date(timeIntervalSinceNow: timeout)
+        while !condition(), Date() < deadline {
+            RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.01))
+        }
+        XCTAssertTrue(condition(), file: file, line: line)
     }
 }
 
