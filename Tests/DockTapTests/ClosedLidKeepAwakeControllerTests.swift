@@ -9,7 +9,6 @@ final class ClosedLidKeepAwakeControllerTests: XCTestCase {
     private var settingsStore: SettingsStore!
     private var helperClient: FakeClosedLidHelperClient!
     private var logStore: LogStore!
-    private var displaySleepController: FakeClosedLidDisplaySleepController!
     private var controller: ClosedLidKeepAwakeController!
 
     override class func setUp() {
@@ -30,12 +29,10 @@ final class ClosedLidKeepAwakeControllerTests: XCTestCase {
         settingsStore = SettingsStore(defaults: defaults)
         helperClient = FakeClosedLidHelperClient()
         logStore = LogStore()
-        displaySleepController = FakeClosedLidDisplaySleepController()
         controller = ClosedLidKeepAwakeController(
             settingsStore: settingsStore,
             helperClient: helperClient,
-            logStore: logStore,
-            displaySleepController: displaySleepController
+            logStore: logStore
         )
         AlertRunModalStub.reset()
     }
@@ -44,7 +41,6 @@ final class ClosedLidKeepAwakeControllerTests: XCTestCase {
         controller.invalidate()
         defaults.removePersistentDomain(forName: suiteName)
         controller = nil
-        displaySleepController = nil
         logStore = nil
         helperClient = nil
         settingsStore = nil
@@ -93,16 +89,6 @@ final class ClosedLidKeepAwakeControllerTests: XCTestCase {
         XCTAssertEqual(helperClient.stopTokens, ["forever-token"])
         XCTAssertEqual(helperClient.stopReasons, ["menu"])
         XCTAssertEqual(controller.state, .off)
-    }
-
-    func testDisplaySleepMonitoringFollowsActiveKeepAwakeState() {
-        settingsStore.hasSeenClosedLidWarning = true
-        helperClient.startResults.append(.started(.indefinite(token: "forever-token")))
-
-        controller.enableIndefinitely()
-        controller.stopNow()
-
-        XCTAssertEqual(displaySleepController.keepAwakeActiveValues, [true, false])
     }
 
     func testAlreadyActiveResultAdoptsHelperSessionAndSuppressesModeSwitching() {
@@ -503,12 +489,10 @@ final class ClosedLidKeepAwakeControllerTests: XCTestCase {
         approvalFollowUpPrepareTimeout: TimeInterval = 60
     ) {
         controller.invalidate()
-        displaySleepController = FakeClosedLidDisplaySleepController()
         controller = ClosedLidKeepAwakeController(
             settingsStore: settingsStore,
             helperClient: helperClient,
             logStore: logStore,
-            displaySleepController: displaySleepController,
             approvalFollowUpMaxAttempts: approvalFollowUpMaxAttempts,
             approvalFollowUpRetryInterval: approvalFollowUpRetryInterval,
             approvalFollowUpPrepareTimeout: approvalFollowUpPrepareTimeout
@@ -593,19 +577,6 @@ private final class FakeClosedLidHelperClient: ClosedLidHelperClienting {
     }
 
     func invalidate() {}
-}
-
-private final class FakeClosedLidDisplaySleepController: ClosedLidDisplaySleepControlling {
-    private(set) var keepAwakeActiveValues: [Bool] = []
-    private(set) var invalidateCallCount = 0
-
-    func setKeepAwakeActive(_ isActive: Bool) {
-        keepAwakeActiveValues.append(isActive)
-    }
-
-    func invalidate() {
-        invalidateCallCount += 1
-    }
 }
 
 private extension ClosedLidHelperSession {

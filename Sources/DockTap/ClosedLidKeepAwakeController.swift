@@ -13,9 +13,6 @@ final class ClosedLidKeepAwakeController {
 
     private(set) var state: ClosedLidKeepAwakeState = .off {
         didSet {
-            if oldValue.isActive != state.isActive {
-                displaySleepController.setKeepAwakeActive(state.isActive)
-            }
             if oldValue != state {
                 onStateChanged?()
             }
@@ -25,7 +22,6 @@ final class ClosedLidKeepAwakeController {
     private let settingsStore: SettingsStore
     private let helperClient: ClosedLidHelperClienting
     private let logStore: LogStore
-    private let displaySleepController: ClosedLidDisplaySleepControlling
     private let approvalFollowUpMaxAttempts: Int
     private let approvalFollowUpRetryInterval: TimeInterval
     private let approvalFollowUpPrepareTimeout: TimeInterval
@@ -55,7 +51,6 @@ final class ClosedLidKeepAwakeController {
         settingsStore: SettingsStore,
         helperClient: ClosedLidHelperClienting,
         logStore: LogStore,
-        displaySleepController: ClosedLidDisplaySleepControlling? = nil,
         approvalFollowUpMaxAttempts: Int = ApprovalFollowUp.maxAttempts,
         approvalFollowUpRetryInterval: TimeInterval = ApprovalFollowUp.retryInterval,
         approvalFollowUpPrepareTimeout: TimeInterval = ApprovalFollowUp.prepareTimeout
@@ -63,7 +58,6 @@ final class ClosedLidKeepAwakeController {
         self.settingsStore = settingsStore
         self.helperClient = helperClient
         self.logStore = logStore
-        self.displaySleepController = displaySleepController ?? ClosedLidDisplaySleepController(logStore: logStore)
         self.approvalFollowUpMaxAttempts = approvalFollowUpMaxAttempts
         self.approvalFollowUpRetryInterval = approvalFollowUpRetryInterval
         self.approvalFollowUpPrepareTimeout = approvalFollowUpPrepareTimeout
@@ -111,7 +105,6 @@ final class ClosedLidKeepAwakeController {
         renewalTimer?.invalidate()
         stopTimeoutTimer?.invalidate()
         cancelApprovalFollowUp()
-        displaySleepController.invalidate()
         helperClient.invalidate()
     }
 
