@@ -383,8 +383,11 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
 
     private func confirmedRegistrationResult() -> ClosedLidHelperPreparationResult {
         let result = resultAfterRegistration()
-        if case .ready = result {
+        switch result {
+        case .ready, .requiresApproval:
             rememberRegisteredGeneration()
+        case .notFound, .unsafeActiveSession, .failure:
+            break
         }
         return result
     }
