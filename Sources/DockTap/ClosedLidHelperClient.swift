@@ -236,8 +236,7 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
     private func registerHelper() -> ClosedLidHelperPreparationResult {
         do {
             try service.register()
-            rememberRegisteredGeneration()
-            return resultAfterRegistration()
+            return confirmedRegistrationResult()
         } catch {
             return registrationFailureResult(error)
         }
@@ -259,9 +258,11 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
 
         do {
             try service.register()
-            rememberRegisteredGeneration()
-            logStore.append("closed-lid helper re-registered generation=\(bundledHelperGeneration)")
-            return resultAfterRegistration()
+            let result = confirmedRegistrationResult()
+            if case .ready = result {
+                logStore.append("closed-lid helper re-registered generation=\(bundledHelperGeneration)")
+            }
+            return result
         } catch {
             return registrationFailureResult(error, shouldAcceptAlreadyRegistered: false)
         }
@@ -380,6 +381,14 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
         }
     }
 
+    private func confirmedRegistrationResult() -> ClosedLidHelperPreparationResult {
+        let result = resultAfterRegistration()
+        if case .ready = result {
+            rememberRegisteredGeneration()
+        }
+        return result
+    }
+
     private func registrationFailureResult(
         _ error: Error,
         shouldAcceptAlreadyRegistered: Bool = true
@@ -392,8 +401,7 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
             guard shouldAcceptAlreadyRegistered else {
                 return .failure("helper re-registration failed: helper was still registered after unregister")
             }
-            rememberRegisteredGeneration()
-            return resultAfterRegistration()
+            return confirmedRegistrationResult()
         }
         return .failure("helper registration failed: \(error.localizedDescription)")
     }

@@ -129,6 +129,23 @@ final class ClosedLidHelperClientTests: XCTestCase {
         XCTAssertTrue(message.contains("helper LaunchDaemon plist"))
         XCTAssertEqual(service.registerCallCount, 1)
         XCTAssertEqual(service.unregisterCallCount, 0)
+        XCTAssertNil(defaults.string(forKey: "closedLidHelperRegisteredGeneration"))
+    }
+
+    func testPrepareReturnsFailureWhenNotFoundServiceRegisterThrows() {
+        service.status = .notFound
+        service.registerError = NSError(domain: "DockTapTests", code: 48)
+
+        let result = prepareForUse()
+
+        guard case .failure(let message) = result else {
+            XCTFail("Expected failure, got \(result)")
+            return
+        }
+        XCTAssertTrue(message.contains("helper registration failed"))
+        XCTAssertEqual(service.registerCallCount, 1)
+        XCTAssertEqual(service.unregisterCallCount, 0)
+        XCTAssertNil(defaults.string(forKey: "closedLidHelperRegisteredGeneration"))
     }
 
     func testReregisterFailsWhenUnregisterFails() {
