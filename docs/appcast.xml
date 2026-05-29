@@ -3,8 +3,18 @@
     <channel>
         <title>DockTap</title>
         <item>
+            <title>0.7.2</title>
+            <pubDate>Fri, 29 May 2026 16:16:37 -0600</pubDate>
+            <link>https://github.com/xavierliang/dock-tap</link>
+            <sparkle:version>9</sparkle:version>
+            <sparkle:shortVersionString>0.7.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/xavierliang/dock-tap/releases/download/v0.7.2/DockTap-0.7.2-arm64.dmg" length="3088464" type="application/octet-stream" sparkle:edSignature="4Ma+UbUHNDCDlvFIdrdp8AlgbuTxBvdzjBNIOu7AjABBiLK+NAu/75OM1y8oXW4CFaRMiMvFRZ2rwFliTM6UAw=="/>
+        </item>
+        <item>
             <title>0.7.1</title>
-            <pubDate>Fri, 29 May 2026 15:02:12 -0600</pubDate>
+            <pubDate>Fri, 29 May 2026 16:16:41 -0600</pubDate>
             <link>https://github.com/xavierliang/dock-tap</link>
             <sparkle:version>8</sparkle:version>
             <sparkle:shortVersionString>0.7.1</sparkle:shortVersionString>
@@ -14,23 +24,13 @@
         </item>
         <item>
             <title>0.7.0</title>
-            <pubDate>Fri, 29 May 2026 15:02:12 -0600</pubDate>
+            <pubDate>Fri, 29 May 2026 16:16:41 -0600</pubDate>
             <link>https://github.com/xavierliang/dock-tap</link>
             <sparkle:version>7</sparkle:version>
             <sparkle:shortVersionString>0.7.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
             <enclosure url="https://github.com/xavierliang/dock-tap/releases/download/v0.7.0/DockTap-0.7.0-arm64.dmg" length="3085173" type="application/octet-stream" sparkle:edSignature="tLULjPe/M+Ww/CbT2asBk2XesnN0YmrCtNXdR/uC1/19injF7A3KNb3Tr0/VSrdJ5Ze6y0ENuoh17tIii3/dBw=="/>
-        </item>
-        <item>
-            <title>0.6.0</title>
-            <pubDate>Fri, 29 May 2026 15:02:12 -0600</pubDate>
-            <link>https://github.com/xavierliang/dock-tap</link>
-            <sparkle:version>6</sparkle:version>
-            <sparkle:shortVersionString>0.6.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/xavierliang/dock-tap/releases/download/v0.6.0/DockTap-0.6.0-arm64.dmg" length="2653843" type="application/octet-stream" sparkle:edSignature="Q+uhfyYWaSXCxgssNbeEGqVuiFcWyDp344vVPjxJGDUCMAbZULzuXLXKDgOB0e11igWYsZZjsIb/bE8s76hrDQ=="/>
         </item>
     </channel>
 </rss>
