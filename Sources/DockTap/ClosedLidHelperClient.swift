@@ -71,7 +71,20 @@ protocol ClosedLidHelperClienting: AnyObject {
 
 private enum ReregistrationReadiness {
     case inactiveOrRestored
-    case blocked(ClosedLidHelperPreparationResult)
+    case blocked(ClosedLidHelperPreparationResult, activeSession: ClosedLidHelperSession?)
+}
+
+private struct RegistrationPreparationOutcome {
+    let result: ClosedLidHelperPreparationResult
+    let activeSession: ClosedLidHelperSession?
+
+    init(
+        _ result: ClosedLidHelperPreparationResult,
+        activeSession: ClosedLidHelperSession? = nil
+    ) {
+        self.result = result
+        self.activeSession = activeSession
+    }
 }
 
 private struct PmsetSleepDisabledReader {
@@ -132,6 +145,7 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
     private let service: any ClosedLidServiceManaging
     private let defaults: UserDefaults
     private let logStore: LogStore
+    private let rawStatusProvider: ((@escaping (ClosedLidHelperStatusResult) -> Void) -> Void)?
     private let reregistrationStatusProvider: ((@escaping (ClosedLidHelperStatusResult) -> Void) -> Void)?
     private let reregistrationStopper: ((String, String, @escaping (ClosedLidHelperStopResult) -> Void) -> Void)?
     private let sleepDisabledReader: () -> Bool?
@@ -144,6 +158,7 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
         service: any ClosedLidServiceManaging = SMAppService.daemon(plistName: ClosedLidHelperClient.daemonPlistName),
         defaults: UserDefaults = .standard,
         logStore: LogStore,
+        rawStatusProvider: ((@escaping (ClosedLidHelperStatusResult) -> Void) -> Void)? = nil,
         reregistrationStatusProvider: ((@escaping (ClosedLidHelperStatusResult) -> Void) -> Void)? = nil,
         reregistrationStopper: ((String, String, @escaping (ClosedLidHelperStopResult) -> Void) -> Void)? = nil,
         sleepDisabledReader: @escaping () -> Bool? = { PmsetSleepDisabledReader().sleepDisabled() },
@@ -152,6 +167,7 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
         self.service = service
         self.defaults = defaults
         self.logStore = logStore
+        self.rawStatusProvider = rawStatusProvider
         self.reregistrationStatusProvider = reregistrationStatusProvider
         self.reregistrationStopper = reregistrationStopper
         self.sleepDisabledReader = sleepDisabledReader
@@ -218,6 +234,33 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
             return
         }
 
+        switch service.status {
+        case .notRegistered, .notFound:
+            completion(.stopped)
+            return
+        case .requiresApproval:
+            completion(.requiresApproval)
+            return
+        case .enabled:
+            break
+        @unknown default:
+            completion(.failure("helper status is unknown"))
+            return
+        }
+
+        guard registeredHelperGenerationMatches else {
+            repairStaleRegistrationForStop(completion: completion)
+            return
+        }
+
+        rawStop(token: token, reason: reason, completion: completion)
+    }
+
+    private func rawStop(
+        token: String,
+        reason: String,
+        completion: @escaping (ClosedLidHelperStopResult) -> Void
+    ) {
         guard let proxy = helperProxy(errorHandler: { error in
             completion(.failure("helper stop failed: \(error.localizedDescription)"))
         }) else {
@@ -270,6 +313,11 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
             return
         }
 
+        if let rawStatusProvider {
+            rawStatusProvider(completion)
+            return
+        }
+
         guard let proxy = helperProxy(errorHandler: { error in
             completion(.failure("helper status failed: \(error.localizedDescription)"))
         }) else {
@@ -287,10 +335,21 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
     private func repairStaleRegistrationForStatus(completion: @escaping (ClosedLidHelperStatusResult) -> Void) {
         registrationQueue.async { [weak self] in
             guard let self else { return }
-            let repairResult = self.prepareForUseOnRegistrationQueue()
+            let repairResult = self.prepareForUseOutcomeOnRegistrationQueue()
             let statusResult = self.statusResultAfterRegistrationRepair(repairResult)
             DispatchQueue.main.async {
                 completion(statusResult)
+            }
+        }
+    }
+
+    private func repairStaleRegistrationForStop(completion: @escaping (ClosedLidHelperStopResult) -> Void) {
+        registrationQueue.async { [weak self] in
+            guard let self else { return }
+            let repairResult = self.prepareForUseOutcomeOnRegistrationQueue()
+            let stopResult = self.stopResultAfterRegistrationRepair(repairResult.result)
+            DispatchQueue.main.async {
+                completion(stopResult)
             }
         }
     }
@@ -305,18 +364,22 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
     }
 
     private func prepareForUseOnRegistrationQueue() -> ClosedLidHelperPreparationResult {
+        prepareForUseOutcomeOnRegistrationQueue().result
+    }
+
+    private func prepareForUseOutcomeOnRegistrationQueue() -> RegistrationPreparationOutcome {
         switch service.status {
         case .enabled:
             guard registeredHelperGenerationMatches else {
                 return reregisterHelper()
             }
-            return .ready
+            return RegistrationPreparationOutcome(.ready)
         case .notRegistered, .notFound:
-            return registerHelper()
+            return RegistrationPreparationOutcome(registerHelper())
         case .requiresApproval:
-            return .requiresApproval
+            return RegistrationPreparationOutcome(.requiresApproval)
         @unknown default:
-            return .failure("helper status is unknown")
+            return RegistrationPreparationOutcome(.failure("helper status is unknown"))
         }
     }
 
@@ -329,18 +392,20 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
         }
     }
 
-    private func reregisterHelper() -> ClosedLidHelperPreparationResult {
+    private func reregisterHelper() -> RegistrationPreparationOutcome {
         switch proveOldHelperInactiveOrRestored() {
         case .inactiveOrRestored:
             invalidate()
-        case .blocked(let result):
-            return result
+        case .blocked(let result, let activeSession):
+            return RegistrationPreparationOutcome(result, activeSession: activeSession)
         }
 
         do {
             try service.unregister()
         } catch {
-            return .failure("helper re-registration failed while unregistering old helper: \(error.localizedDescription)")
+            return RegistrationPreparationOutcome(
+                .failure("helper re-registration failed while unregistering old helper: \(error.localizedDescription)")
+            )
         }
 
         do {
@@ -349,9 +414,11 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
             if case .ready = result {
                 logStore.append("closed-lid helper re-registered generation=\(bundledHelperGeneration)")
             }
-            return result
+            return RegistrationPreparationOutcome(result)
         } catch {
-            return registrationFailureResult(error, shouldAcceptAlreadyRegistered: false)
+            return RegistrationPreparationOutcome(
+                registrationFailureResult(error, shouldAcceptAlreadyRegistered: false)
+            )
         }
     }
 
@@ -377,7 +444,10 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
 
     private func stopOldHelperBeforeReregistration(_ session: ClosedLidHelperSession) -> ReregistrationReadiness {
         guard let result = waitForOldHelperStop(token: session.token) else {
-            return reregistrationBlocked("helper re-registration blocked: old helper stop timed out")
+            return reregistrationBlocked(
+                "helper re-registration blocked: old helper stop timed out",
+                activeSession: session
+            )
         }
 
         switch result {
@@ -385,9 +455,15 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
             logStore.append("closed-lid helper old generation stopped before re-registration")
             return .inactiveOrRestored
         case .requiresApproval:
-            return reregistrationBlocked("helper re-registration blocked: old helper requires approval before it can be stopped")
+            return reregistrationBlocked(
+                "helper re-registration blocked: old helper requires approval before it can be stopped",
+                activeSession: session
+            )
         case .failure(let message):
-            return reregistrationBlocked("helper re-registration blocked: old helper stop failed: \(message)")
+            return reregistrationBlocked(
+                "helper re-registration blocked: old helper stop failed: \(message)",
+                activeSession: session
+            )
         }
     }
 
@@ -431,7 +507,7 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
                     completion(.failure("helper client was released"))
                     return
                 }
-                self.stop(token: token, reason: reason, completion: completion)
+                self.rawStop(token: token, reason: reason, completion: completion)
             }
         }
         stopper(token, "helperReregistration") {
@@ -449,8 +525,11 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
         .now() + .milliseconds(Int(reregistrationWaitTimeout * 1_000))
     }
 
-    private func reregistrationBlocked(_ message: String) -> ReregistrationReadiness {
-        .blocked(.unsafeActiveSession(message))
+    private func reregistrationBlocked(
+        _ message: String,
+        activeSession: ClosedLidHelperSession? = nil
+    ) -> ReregistrationReadiness {
+        .blocked(.unsafeActiveSession(message), activeSession: activeSession)
     }
 
     private func reregistrationBlockedUnlessSleepDisabledIsOff(_ message: String) -> ReregistrationReadiness {
@@ -495,10 +574,26 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
         return result
     }
 
-    private func statusResultAfterRegistrationRepair(_ result: ClosedLidHelperPreparationResult) -> ClosedLidHelperStatusResult {
-        switch result {
+    private func statusResultAfterRegistrationRepair(_ outcome: RegistrationPreparationOutcome) -> ClosedLidHelperStatusResult {
+        switch outcome.result {
         case .ready:
             return .inactive
+        case .requiresApproval:
+            return .requiresApproval
+        case .unsafeActiveSession(let message):
+            if let activeSession = outcome.activeSession {
+                return .failureWithActiveSession(activeSession, message)
+            }
+            return .failure(message)
+        case .notFound(let message), .failure(let message):
+            return .failure(message)
+        }
+    }
+
+    private func stopResultAfterRegistrationRepair(_ result: ClosedLidHelperPreparationResult) -> ClosedLidHelperStopResult {
+        switch result {
+        case .ready:
+            return .stopped
         case .requiresApproval:
             return .requiresApproval
         case .notFound(let message), .unsafeActiveSession(let message), .failure(let message):
