@@ -12,6 +12,9 @@ final class ClosedLidKeepAwakeController {
 
     private(set) var state: ClosedLidKeepAwakeState = .off {
         didSet {
+            if oldValue.isActive != state.isActive {
+                displaySleepController.setKeepAwakeActive(state.isActive)
+            }
             if oldValue != state {
                 onStateChanged?()
             }
@@ -21,6 +24,7 @@ final class ClosedLidKeepAwakeController {
     private let settingsStore: SettingsStore
     private let helperClient: ClosedLidHelperClienting
     private let logStore: LogStore
+    private let displaySleepController: ClosedLidDisplaySleepControlling
 
     private var renewalTimer: Timer?
     private var stopTimeoutTimer: Timer?
@@ -45,11 +49,13 @@ final class ClosedLidKeepAwakeController {
     init(
         settingsStore: SettingsStore,
         helperClient: ClosedLidHelperClienting,
-        logStore: LogStore
+        logStore: LogStore,
+        displaySleepController: ClosedLidDisplaySleepControlling? = nil
     ) {
         self.settingsStore = settingsStore
         self.helperClient = helperClient
         self.logStore = logStore
+        self.displaySleepController = displaySleepController ?? ClosedLidDisplaySleepController(logStore: logStore)
     }
 
     func refreshStatus() {
@@ -94,6 +100,7 @@ final class ClosedLidKeepAwakeController {
         renewalTimer?.invalidate()
         stopTimeoutTimer?.invalidate()
         cancelApprovalFollowUp()
+        displaySleepController.invalidate()
         helperClient.invalidate()
     }
 
