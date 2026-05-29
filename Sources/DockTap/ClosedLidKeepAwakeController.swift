@@ -604,8 +604,11 @@ final class ClosedLidKeepAwakeController {
         activeStopReason = reason
         cancelApprovalFollowUp()
         clearActiveSession()
+        state = .stopping
         logStore.append("closed-lid pending approval follow-up canceled reason=\(reason)")
-        completeStop(success: true, message: nil)
+        DispatchQueue.main.async { [weak self] in
+            self?.completeStop(success: true, message: nil)
+        }
     }
 
     private func completeStop(success: Bool, message: String?) {

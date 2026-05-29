@@ -189,6 +189,12 @@ final class ClosedLidKeepAwakeControllerTests: XCTestCase {
             completion = (success, message)
         }
 
+        XCTAssertNil(completion)
+        XCTAssertEqual(controller.state, .stopping)
+        XCTAssertTrue(controller.requiresStopGate)
+
+        runMainRunLoop(until: { completion != nil })
+
         XCTAssertEqual(completion?.success, true)
         XCTAssertNil(completion?.message)
         XCTAssertEqual(controller.state, .off)
@@ -196,6 +202,41 @@ final class ClosedLidKeepAwakeControllerTests: XCTestCase {
 
         helperClient.completePendingPrepare(.ready)
 
+        XCTAssertTrue(helperClient.startDurations.isEmpty)
+        XCTAssertTrue(helperClient.stopTokens.isEmpty)
+    }
+
+    func testStopBeforeTerminationCancelsApprovalFollowUpRetryTimerBeforeItCanStartHelper() {
+        recreateController(approvalFollowUpRetryInterval: 0.01)
+        settingsStore.hasSeenClosedLidWarning = true
+        helperClient.prepareResults = [.requiresApproval, .requiresApproval, .ready]
+        helperClient.startResults.append(.started(.timed(token: "late-approved-token", endDate: Date())))
+
+        controller.enableForOneHour()
+        XCTAssertEqual(controller.state, .requiresApproval)
+        XCTAssertEqual(helperClient.prepareCallCount, 2)
+        XCTAssertTrue(controller.requiresStopGate)
+        XCTAssertTrue(helperClient.startDurations.isEmpty)
+
+        var completion: (success: Bool, message: String?)?
+        controller.stopBeforeTermination(reason: "update") { success, message in
+            completion = (success, message)
+        }
+
+        XCTAssertNil(completion)
+        XCTAssertEqual(controller.state, .stopping)
+
+        runMainRunLoop(until: { completion != nil })
+        XCTAssertEqual(completion?.success, true)
+        XCTAssertNil(completion?.message)
+        XCTAssertEqual(controller.state, .off)
+        XCTAssertFalse(controller.requiresStopGate)
+
+        let prepareCallCountAfterCancellation = helperClient.prepareCallCount
+        let retryDeadline = Date(timeIntervalSinceNow: 0.05)
+        runMainRunLoop(until: { Date() >= retryDeadline })
+
+        XCTAssertEqual(helperClient.prepareCallCount, prepareCallCountAfterCancellation)
         XCTAssertTrue(helperClient.startDurations.isEmpty)
         XCTAssertTrue(helperClient.stopTokens.isEmpty)
     }
