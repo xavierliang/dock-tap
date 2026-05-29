@@ -142,14 +142,12 @@ final class EventTapController {
 
         switch type {
         case .flagsChanged:
-            let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
-            let isDown = Self.isKeyDown(keyCode)
-            modifierState.setPhysicalKey(keyCode, isDown: isDown)
+            modifierState.resync { Self.isModifierDown($0, flags: event.flags) }
             return Unmanaged.passUnretained(event)
 
         case .keyDown, .keyUp:
             let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
-            modifierState.resync(readKeyDown: Self.isKeyDown)
+            modifierState.resync { Self.isModifierDown($0, flags: event.flags) }
             let input = currentInputSnapshot()
             let decision = decider.decide(
                 kind: type == .keyDown ? .keyDown : .keyUp,
@@ -394,8 +392,11 @@ final class EventTapController {
         }
     }
 
-    private static func isKeyDown(_ keyCode: UInt16) -> Bool {
-        CGEventSource.keyState(.hidSystemState, key: CGKeyCode(keyCode))
+    private static func isModifierDown(_ keyCode: UInt16, flags: CGEventFlags) -> Bool {
+        guard let mask = KeyCodes.deviceFlag(for: keyCode) else {
+            return false
+        }
+        return flags.contains(mask)
     }
 
     private static func eventMask(_ types: CGEventType...) -> CGEventMask {

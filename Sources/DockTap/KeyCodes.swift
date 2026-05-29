@@ -75,4 +75,34 @@ enum KeyCodes {
         default: "key\(keyCode)"
         }
     }
+
+    // Device-dependent modifier mask for a physical key code. Unlike the generic
+    // CGEventFlags masks (maskCommand/maskAlternate/...), these bits tell left and
+    // right modifier keys apart, which is what the trigger preset relies on.
+    static func deviceFlag(for keyCode: UInt16) -> CGEventFlags? {
+        switch keyCode {
+        case leftControl:
+            return CGEventFlags(rawValue: 0x0000_0001) // NX_DEVICELCTLKEYMASK
+        case leftShift:
+            return CGEventFlags(rawValue: 0x0000_0002) // NX_DEVICELSHIFTKEYMASK
+        case rightShift:
+            return CGEventFlags(rawValue: 0x0000_0004) // NX_DEVICERSHIFTKEYMASK
+        case leftCommand:
+            return CGEventFlags(rawValue: 0x0000_0008) // NX_DEVICELCMDKEYMASK
+        case rightCommand:
+            return CGEventFlags(rawValue: 0x0000_0010) // NX_DEVICERCMDKEYMASK
+        case leftOption:
+            return CGEventFlags(rawValue: 0x0000_0020) // NX_DEVICELALTKEYMASK
+        case rightOption:
+            return CGEventFlags(rawValue: 0x0000_0040) // NX_DEVICERALTKEYMASK
+        case rightControl:
+            return CGEventFlags(rawValue: 0x0000_2000) // NX_DEVICERCTLKEYMASK
+        case capsLock:
+            return .maskAlphaShift
+        case function:
+            return .maskSecondaryFn
+        default:
+            return nil
+        }
+    }
 }
