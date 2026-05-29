@@ -4,7 +4,7 @@ Dock Tap is a macOS 13+ menu bar app that maps one physical modifier preset plus
 
 ## Install
 
-Download the latest notarized `DockTap-<version>-arm64.dmg` from GitHub Releases, open it, and drag `DockTap.app` to `/Applications`.
+Download the latest notarized `DockTap-<version>-arm64.dmg` from GitHub Releases, open it, and drag `DockTap.app` to `/Applications`. Keeping Dock Tap in `/Applications` is also the supported path for the privileged Closed-Lid helper.
 
 On first launch, grant Dock Tap Accessibility access in System Settings. Dock Tap uses that permission to activate Dock apps and, when enabled, resize the focused window.
 
@@ -12,7 +12,7 @@ On first launch, grant Dock Tap Accessibility access in System Settings. Dock Ta
 
 Launch Dock Tap from `/Applications`. Choose a trigger preset from the menu bar item, then hold that physical modifier and press `1` through `0` to activate the matching Dock app. Press the same modifier plus backtick to activate Finder.
 
-Use the menu to refresh Dock shortcuts, enable or disable Window Snap, and configure Launch at Login.
+Use the menu to refresh Dock shortcuts, enable or disable Window Snap, control Closed-Lid Keep Awake, and configure Launch at Login.
 
 Use `Check for Updates…` to open the Sparkle updater. Dock Tap also lets Sparkle handle scheduled background update prompts when a signed update is available.
 
@@ -71,15 +71,37 @@ When Window Snap is enabled, Dock Tap consumes those chords before the focused a
 
 Use the menu toggle as the quick escape hatch, or choose a trigger preset that does not overlap the shortcuts you rely on. If you want cycling, thirds, sixths, layouts, drag snapping, or cross-display window movement, Rectangle is the better tool for that full window-management suite.
 
+## Closed-Lid Keep Awake
+
+The `Closed-Lid Keep Awake` submenu can keep the Mac awake with the lid closed by using the privileged helper to run the fixed system power setting `pmset -a disablesleep 1`.
+
+Menu commands:
+
+- `Enable for 1 Hour` starts a timed session. The helper owns the one-hour expiry and restores normal lid sleep when it ends.
+- `Enable Indefinitely` starts a session with no wall-clock expiry, but Dock Tap must keep renewing its helper lease. If Dock Tap quits, crashes, or stops renewing, the helper restores normal lid sleep.
+- `Stop Now` restores normal lid sleep immediately by running `pmset -a disablesleep 0`.
+
+The first enable shows a warning because this changes normal lid-sleep behavior and can increase battery drain and heat. Use it only on a ventilated surface. After you continue once, Dock Tap remembers the acknowledgement.
+
+The helper is registered lazily on first use, not at app launch. macOS may require approval in System Settings > General > Login Items & Extensions; when approval is pending, the submenu shows `Helper approval required` and offers `Open Login Items Settings...`.
+
+While a closed-lid session is active, both enable commands are disabled. To switch between timed and indefinite modes, choose `Stop Now` first. Dock Tap does not automatically re-enable a previous session on launch.
+
+Dock Tap blocks normal quit and Sparkle update installation until the helper confirms `pmset -a disablesleep 0`. If that confirmation fails, Dock Tap stays open and shows the manual recovery command:
+
+```sh
+sudo pmset -a disablesleep 0
+```
+
 ## Launch at Login
 
-Dock Tap uses `SMAppService.mainApp`; there is no helper target. macOS registers the currently running packaged app path. For daily use, keep that path stable before enabling Launch at Login. To use `/Applications`, first copy the built app to `/Applications/DockTap.app`, launch `/Applications/DockTap.app`, then enable Launch at Login from that running copy. Do not enable Launch at Login from `build/DockTap.app` and move the app afterward.
+Dock Tap uses `SMAppService.mainApp` for Launch at Login. macOS registers the currently running packaged app path. For daily use, keep that path stable before enabling Launch at Login. To use `/Applications`, first copy the built app to `/Applications/DockTap.app`, launch `/Applications/DockTap.app`, then enable Launch at Login from that running copy. Do not enable Launch at Login from `build/DockTap.app` and move the app afterward.
 
 The menu reads Launch at Login state from `SMAppService.mainApp.status`. If macOS reports approval required, approve Dock Tap in System Settings > General > Login Items. If register or unregister fails, the menu remains based on the actual service status rather than the requested action.
 
 ## Known Limits
 
-Dock Tap is arm64-only and requires macOS 13 or newer. It reads Dock preferences on launch/menu open and treats Dock slots as read-only; it does not mutate Dock contents, remap slots, or support custom triggers. Window Snap covers only the listed fixed actions and is not a Rectangle replacement. Sparkle updates download the full DMG because delta updates are not currently published.
+Dock Tap is arm64-only and requires macOS 13 or newer. It reads Dock preferences on launch/menu open and treats Dock slots as read-only; it does not mutate Dock contents, remap slots, or support custom triggers. Window Snap covers only the listed fixed actions and is not a Rectangle replacement. Closed-Lid Keep Awake intentionally does not monitor battery level or thermals. Sparkle updates download the full DMG because delta updates are not currently published.
 
 ## License
 

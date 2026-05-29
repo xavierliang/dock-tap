@@ -63,4 +63,20 @@ final class SettingsStoreTests: XCTestCase {
         store.windowActionsEnabled = false
         XCTAssertFalse(SettingsStore(defaults: defaults).windowActionsEnabled)
     }
+
+    func testClosedLidWarningAcknowledgementDefaultsToFalse() {
+        let store = SettingsStore(defaults: defaults)
+
+        XCTAssertFalse(store.hasSeenClosedLidWarning)
+    }
+
+    func testPersistsClosedLidWarningAcknowledgement() {
+        let store = SettingsStore(defaults: defaults)
+
+        store.hasSeenClosedLidWarning = true
+        XCTAssertTrue(SettingsStore(defaults: defaults).hasSeenClosedLidWarning)
+
+        store.hasSeenClosedLidWarning = false
+        XCTAssertFalse(SettingsStore(defaults: defaults).hasSeenClosedLidWarning)
+    }
 }

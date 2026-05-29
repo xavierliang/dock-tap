@@ -188,6 +188,81 @@ final class MenuContentModelTests: XCTestCase {
         )
     }
 
+    func testClosedLidMenuOffStateEnablesStartCommandsOnly() {
+        let model = model(closedLidState: .off)
+
+        XCTAssertEqual(model.closedLidMenu.title, "Closed-Lid Keep Awake")
+        XCTAssertEqual(model.closedLidMenu.statusTitle, "Off")
+        XCTAssertEqual(model.closedLidMenu.enableOneHourTitle, "Enable for 1 Hour")
+        XCTAssertTrue(model.closedLidMenu.enableOneHourIsEnabled)
+        XCTAssertFalse(model.closedLidMenu.enableOneHourIsChecked)
+        XCTAssertEqual(model.closedLidMenu.enableIndefinitelyTitle, "Enable Indefinitely")
+        XCTAssertTrue(model.closedLidMenu.enableIndefinitelyIsEnabled)
+        XCTAssertFalse(model.closedLidMenu.enableIndefinitelyIsChecked)
+        XCTAssertEqual(model.closedLidMenu.stopNowTitle, "Stop Now")
+        XCTAssertFalse(model.closedLidMenu.stopNowIsEnabled)
+        XCTAssertNil(model.closedLidMenu.openApprovalSettingsTitle)
+    }
+
+    func testClosedLidMenuActiveTimedDisablesModeSwitchingAndChecksTimedCommand() {
+        let endDate = Date(timeIntervalSinceReferenceDate: 8_000)
+        let model = model(closedLidState: .activeTimed(endDate: endDate))
+        let expectedStatus = AppText.ClosedLid.onUntil(
+            time: DateFormatter.localizedString(from: endDate, dateStyle: .none, timeStyle: .short)
+        )
+
+        XCTAssertEqual(model.closedLidMenu.statusTitle, expectedStatus)
+        XCTAssertFalse(model.closedLidMenu.enableOneHourIsEnabled)
+        XCTAssertTrue(model.closedLidMenu.enableOneHourIsChecked)
+        XCTAssertFalse(model.closedLidMenu.enableIndefinitelyIsEnabled)
+        XCTAssertFalse(model.closedLidMenu.enableIndefinitelyIsChecked)
+        XCTAssertTrue(model.closedLidMenu.stopNowIsEnabled)
+    }
+
+    func testClosedLidMenuActiveIndefiniteDisablesModeSwitchingAndChecksIndefiniteCommand() {
+        let model = model(closedLidState: .activeIndefinite)
+
+        XCTAssertEqual(model.closedLidMenu.statusTitle, "On indefinitely")
+        XCTAssertFalse(model.closedLidMenu.enableOneHourIsEnabled)
+        XCTAssertFalse(model.closedLidMenu.enableOneHourIsChecked)
+        XCTAssertFalse(model.closedLidMenu.enableIndefinitelyIsEnabled)
+        XCTAssertTrue(model.closedLidMenu.enableIndefinitelyIsChecked)
+        XCTAssertTrue(model.closedLidMenu.stopNowIsEnabled)
+    }
+
+    func testClosedLidMenuBusyAndApprovalStatesDisableStartCommands() {
+        let starting = model(closedLidState: .starting).closedLidMenu
+        let stopping = model(closedLidState: .stopping).closedLidMenu
+        let approval = model(closedLidState: .requiresApproval).closedLidMenu
+
+        XCTAssertEqual(starting.statusTitle, "Starting…")
+        XCTAssertFalse(starting.enableOneHourIsEnabled)
+        XCTAssertTrue(starting.stopNowIsEnabled)
+
+        XCTAssertEqual(stopping.statusTitle, "Stopping…")
+        XCTAssertFalse(stopping.enableIndefinitelyIsEnabled)
+        XCTAssertFalse(stopping.stopNowIsEnabled)
+
+        XCTAssertEqual(approval.statusTitle, "Helper approval required")
+        XCTAssertFalse(approval.enableOneHourIsEnabled)
+        XCTAssertFalse(approval.stopNowIsEnabled)
+        XCTAssertEqual(approval.openApprovalSettingsTitle, "Open Login Items Settings...")
+    }
+
+    func testClosedLidMenuErrorAllowsRetryButStopFailureKeepsRecoveryAvailable() {
+        let error = model(closedLidState: .error("helper unavailable")).closedLidMenu
+        let stopFailed = model(closedLidState: .stopFailed("restore failed")).closedLidMenu
+
+        XCTAssertEqual(error.statusTitle, "Error: helper unavailable")
+        XCTAssertTrue(error.enableOneHourIsEnabled)
+        XCTAssertFalse(error.stopNowIsEnabled)
+
+        XCTAssertTrue(stopFailed.statusTitle.contains("Error: restore failed."))
+        XCTAssertTrue(stopFailed.statusTitle.contains("sudo pmset -a disablesleep 0"))
+        XCTAssertFalse(stopFailed.enableOneHourIsEnabled)
+        XCTAssertTrue(stopFailed.stopNowIsEnabled)
+    }
+
     func testVersionTitleShowsVersion() {
         let model = MenuContentModel(
             dockRows: [],
@@ -227,6 +302,19 @@ final class MenuContentModelTests: XCTestCase {
         XCTAssertNil(withoutUpdate.updateAvailableTitle)
         XCTAssertEqual(withUpdate.checkForUpdatesTitle, "Check for Updates…")
         XCTAssertEqual(withUpdate.updateAvailableTitle, "Update Available: v0.2.0")
+    }
+
+    private func model(closedLidState: ClosedLidKeepAwakeState) -> MenuContentModel {
+        MenuContentModel(
+            dockRows: [],
+            selectedPreset: .leftOption,
+            isAccessibilityTrusted: true,
+            isEventTapReady: true,
+            windowActionsEnabled: false,
+            closedLidState: closedLidState,
+            appName: "Dock Tap",
+            appVersion: "0.0.0"
+        )
     }
 
     private func row(
