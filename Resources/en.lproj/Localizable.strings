@@ -1,0 +1,44 @@
+/* Status line */
+"status.ready" = "Ready";
+"status.starting" = "Starting";
+"status.missingAccessibilityPermission" = "Missing Accessibility Permission";
+
+/* Dock shortcuts */
+"dockShortcuts.finder" = "Finder";
+"dockShortcuts.unassigned" = "Unassigned";
+"dockShortcuts.count.one" = "%d Dock shortcut";
+"dockShortcuts.count.other" = "%d Dock shortcuts";
+
+/* Menu */
+"menu.dockShortcuts" = "Dock Shortcuts";
+"menu.triggerModifier" = "Trigger Modifier";
+"menu.triggerModifierFormat" = "Trigger Modifier: %@";
+"menu.updateDockShortcuts" = "Update Dock Shortcuts";
+"menu.showLogs" = "Show Logs";
+"menu.checkAccessibility" = "Check Accessibility";
+"menu.openAccessibilitySettings" = "Open Accessibility Settings";
+"menu.checkForUpdates" = "Check for Updates…";
+"menu.quit" = "Quit";
+"menu.versionFormat" = "Version %@";
+"menu.updateAvailableFormat" = "Update Available: v%@";
+
+/* Window snap */
+"windowSnap.toggle" = "Enable Window Snap";
+"windowSnap.submenu" = "Window Snap Bindings";
+"windowSnap.leftHalf" = "Left Half";
+"windowSnap.rightHalf" = "Right Half";
+"windowSnap.topHalf" = "Top Half";
+"windowSnap.bottomHalf" = "Bottom Half";
+"windowSnap.maximize" = "Maximize";
+"windowSnap.center" = "Center";
+
+/* Launch at login */
+"loginItem.launchAtLogin" = "Launch at Login";
+"loginItem.requiresApproval" = "Launch at Login (Requires Approval)";
+"loginItem.notFound" = "Launch at Login (Not Found)";
+"loginItem.statusError" = "Launch at Login (Status Error)";
+"loginItem.approveHint" = "Approve in System Settings > General > Login Items";
+"loginItem.failureHint" = "Launch at Login change failed";
+
+/* Log window */
+"logWindow.title" = "Dock Tap Logs";

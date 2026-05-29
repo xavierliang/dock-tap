@@ -111,6 +111,10 @@ require_file() {
     [[ -f "$1" ]] || fail "missing required file: $1"
 }
 
+require_dir() {
+    [[ -d "$1" ]] || fail "missing required directory: $1"
+}
+
 copy_resource() {
     local resource="$1"
     require_file "$ROOT/Resources/$resource"
@@ -286,6 +290,8 @@ require_file "$INFO_PLIST"
 require_file "$ROOT/Resources/DockTap.icns"
 require_file "$ROOT/Resources/StatusBarIconTemplate.png"
 require_file "$ROOT/Resources/StatusBarIconTemplate@2x.png"
+require_dir "$ROOT/Resources/en.lproj"
+require_dir "$ROOT/Resources/zh-Hans.lproj"
 
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO_PLIST")"
 [[ -n "$VERSION" ]] || fail "CFBundleShortVersionString is empty"
@@ -330,6 +336,9 @@ mkdir -p "$MACOS" "$APP_RESOURCES"
 copy_resource DockTap.icns
 copy_resource StatusBarIconTemplate.png
 copy_resource StatusBarIconTemplate@2x.png
+for lproj in en.lproj zh-Hans.lproj; do
+    /usr/bin/ditto "$ROOT/Resources/$lproj" "$APP_RESOURCES/$lproj"
+done
 /bin/chmod +x "$MACOS/$APP_NAME"
 /usr/bin/plutil -lint "$CONTENTS/Info.plist" >/dev/null
 

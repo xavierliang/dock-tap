@@ -23,6 +23,9 @@ cp "$ROOT/Resources/Info.plist" "$CONTENTS/Info.plist"
 for resource in DockTap.icns StatusBarIconTemplate.png StatusBarIconTemplate@2x.png; do
     cp "$ROOT/Resources/$resource" "$RESOURCES/$resource"
 done
+for lproj in en.lproj zh-Hans.lproj; do
+    /usr/bin/ditto "$ROOT/Resources/$lproj" "$RESOURCES/$lproj"
+done
 chmod +x "$MACOS/DockTap"
 
 /usr/bin/plutil -lint "$CONTENTS/Info.plist" >/dev/null

@@ -1,0 +1,44 @@
+/* Status line */
+"status.ready" = "准备就绪";
+"status.starting" = "正在启动";
+"status.missingAccessibilityPermission" = "缺少辅助功能权限";
+
+/* Dock shortcuts */
+"dockShortcuts.finder" = "访达";
+"dockShortcuts.unassigned" = "未分配";
+"dockShortcuts.count.one" = "%d 个 Dock 快捷方式";
+"dockShortcuts.count.other" = "%d 个 Dock 快捷方式";
+
+/* Menu */
+"menu.dockShortcuts" = "Dock 快捷方式";
+"menu.triggerModifier" = "触发修饰键";
+"menu.triggerModifierFormat" = "触发修饰键：%@";
+"menu.updateDockShortcuts" = "更新 Dock 快捷方式";
+"menu.showLogs" = "显示日志";
+"menu.checkAccessibility" = "检查辅助功能";
+"menu.openAccessibilitySettings" = "打开辅助功能设置";
+"menu.checkForUpdates" = "检查更新…";
+"menu.quit" = "退出";
+"menu.versionFormat" = "版本 %@";
+"menu.updateAvailableFormat" = "有可用更新：v%@";
+
+/* Window snap */
+"windowSnap.toggle" = "启用窗口贴边";
+"windowSnap.submenu" = "窗口贴边快捷键";
+"windowSnap.leftHalf" = "左半屏";
+"windowSnap.rightHalf" = "右半屏";
+"windowSnap.topHalf" = "上半屏";
+"windowSnap.bottomHalf" = "下半屏";
+"windowSnap.maximize" = "最大化";
+"windowSnap.center" = "居中";
+
+/* Launch at login */
+"loginItem.launchAtLogin" = "登录时启动";
+"loginItem.requiresApproval" = "登录时启动（需批准）";
+"loginItem.notFound" = "登录时启动（未找到）";
+"loginItem.statusError" = "登录时启动（状态错误）";
+"loginItem.approveHint" = "请在「系统设置 > 通用 > 登录项」中批准";
+"loginItem.failureHint" = "登录启动设置修改失败";
+
+/* Log window */
+"logWindow.title" = "Dock Tap 日志";
