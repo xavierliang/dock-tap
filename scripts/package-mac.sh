@@ -5,6 +5,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="DockTap"
 DISPLAY_NAME="Dock Tap"
 BUNDLE_ID="ai.resopod.docktap"
+HELPER_NAME="DockTapClosedLidHelper"
+HELPER_BUNDLE_ID="$BUNDLE_ID.closedlidhelper"
+HELPER_MACH_SERVICE="$HELPER_BUNDLE_ID.xpc"
+LAUNCH_DAEMON_PLIST="$HELPER_BUNDLE_ID.plist"
 DEFAULT_SIGNING_IDENTITY="Developer ID Application: Shenzhen Resopod Technology Limited Company (88DYM3N4W8)"
 
 DIST_DIR="$ROOT/dist"
@@ -14,7 +18,9 @@ STALE_VISIBLE_APP="$DIST_DIR/$APP_NAME.app"
 CONTENTS="$APP/Contents"
 MACOS="$CONTENTS/MacOS"
 APP_RESOURCES="$CONTENTS/Resources"
+LAUNCH_DAEMONS="$CONTENTS/Library/LaunchDaemons"
 INFO_PLIST="$ROOT/Resources/Info.plist"
+LAUNCH_DAEMON_PLIST_SRC="$ROOT/Resources/LaunchDaemons/$LAUNCH_DAEMON_PLIST"
 
 SIGNING_IDENTITY="$DEFAULT_SIGNING_IDENTITY"
 KEYCHAIN_PROFILE="${DOCK_TAP_NOTARY_PROFILE:-}"
@@ -121,6 +127,45 @@ copy_resource() {
     /bin/cp "$ROOT/Resources/$resource" "$APP_RESOURCES/$resource"
 }
 
+plist_value() {
+    /usr/libexec/PlistBuddy -c "Print $1" "$2"
+}
+
+verify_launch_daemon_plist() {
+    local plist="$1"
+    local expected_bundle_program="Contents/Library/LaunchDaemons/$HELPER_NAME"
+
+    require_file "$plist"
+    /usr/bin/plutil -lint "$plist" >/dev/null
+
+    local label
+    label="$(plist_value ":Label" "$plist")"
+    [[ "$label" == "$HELPER_BUNDLE_ID" ]] || fail "LaunchDaemon Label mismatch: $label"
+
+    local bundle_program
+    bundle_program="$(plist_value ":BundleProgram" "$plist")"
+    [[ "$bundle_program" == "$expected_bundle_program" ]] || fail "LaunchDaemon BundleProgram mismatch: $bundle_program"
+
+    local mach_service
+    mach_service="$(plist_value ":MachServices:$HELPER_MACH_SERVICE" "$plist")"
+    [[ "$mach_service" == "true" ]] || fail "LaunchDaemon MachServices missing $HELPER_MACH_SERVICE"
+}
+
+strip_host_rpaths() {
+    local executable="$1"
+
+    /usr/bin/otool -l "$executable" \
+        | /usr/bin/awk '/cmd LC_RPATH/{want=1; next} want && /path /{print $2; want=0}' \
+        | while IFS= read -r rpath; do
+            case "$rpath" in
+                /Applications/Xcode*.app/*|/Library/Developer/CommandLineTools/*)
+                    log "  removing host RPATH from $(basename "$executable"): $rpath"
+                    /usr/bin/install_name_tool -delete_rpath "$rpath" "$executable"
+                    ;;
+            esac
+        done
+}
+
 write_temp_notary_key() {
     TMP_NOTARY_KEY="$(/usr/bin/mktemp "$WORK_DIR/AuthKey.XXXXXX")"
     /bin/chmod 600 "$TMP_NOTARY_KEY"
@@ -181,6 +226,8 @@ prepare_notary_args() {
 verify_app_signature() {
     log "Verifying app code signature"
     /usr/bin/codesign --verify --deep --strict --verbose=2 "$APP"
+    /usr/bin/codesign --verify --strict --verbose=2 "$LAUNCH_DAEMONS/$HELPER_NAME"
+    verify_launch_daemon_plist "$LAUNCH_DAEMONS/$LAUNCH_DAEMON_PLIST"
 
     local signing_details
     signing_details="$(/usr/bin/codesign -dv "$APP" 2>&1)"
@@ -287,6 +334,7 @@ require_tool /usr/bin/xcrun
 require_tool /usr/sbin/spctl
 require_tool /usr/libexec/PlistBuddy
 require_file "$INFO_PLIST"
+require_file "$LAUNCH_DAEMON_PLIST_SRC"
 require_file "$ROOT/Resources/DockTap.icns"
 require_file "$ROOT/Resources/StatusBarIconTemplate.png"
 require_file "$ROOT/Resources/StatusBarIconTemplate@2x.png"
@@ -322,16 +370,21 @@ rm -f "$PACKAGE_ARTIFACT"
 
 cd "$ROOT"
 
-log "Building release arm64 SwiftPM app"
-swift build -c release --arch arm64
+log "Building release arm64 SwiftPM products"
+swift build -c release --arch arm64 --product "$APP_NAME"
+swift build -c release --arch arm64 --product "$HELPER_NAME"
 BIN_DIR="$(swift build -c release --arch arm64 --show-bin-path)"
 BIN="$BIN_DIR/$APP_NAME"
+HELPER_BIN="$BIN_DIR/$HELPER_NAME"
 [[ -x "$BIN" ]] || fail "missing built executable: $BIN"
+[[ -x "$HELPER_BIN" ]] || fail "missing built helper executable: $HELPER_BIN"
 
 log "Assembling $APP"
 rm -rf "$APP"
-mkdir -p "$MACOS" "$APP_RESOURCES"
+mkdir -p "$MACOS" "$APP_RESOURCES" "$LAUNCH_DAEMONS"
 /bin/cp "$BIN" "$MACOS/$APP_NAME"
+/bin/cp "$HELPER_BIN" "$LAUNCH_DAEMONS/$HELPER_NAME"
+/bin/cp "$LAUNCH_DAEMON_PLIST_SRC" "$LAUNCH_DAEMONS/$LAUNCH_DAEMON_PLIST"
 /bin/cp "$INFO_PLIST" "$CONTENTS/Info.plist"
 copy_resource DockTap.icns
 copy_resource StatusBarIconTemplate.png
@@ -340,22 +393,16 @@ for lproj in en.lproj zh-Hans.lproj; do
     /usr/bin/ditto "$ROOT/Resources/$lproj" "$APP_RESOURCES/$lproj"
 done
 /bin/chmod +x "$MACOS/$APP_NAME"
+/bin/chmod +x "$LAUNCH_DAEMONS/$HELPER_NAME"
 /usr/bin/plutil -lint "$CONTENTS/Info.plist" >/dev/null
+verify_launch_daemon_plist "$LAUNCH_DAEMONS/$LAUNCH_DAEMON_PLIST"
 
 log "Fixing runtime search paths in main executable"
 # Strip absolute RPATHs pointing at the build machine's Xcode toolchain — they
 # leak host-specific paths into the shipped binary and at best cause failed
 # dyld lookups on user machines.
-/usr/bin/otool -l "$MACOS/$APP_NAME" \
-    | /usr/bin/awk '/cmd LC_RPATH/{want=1; next} want && /path /{print $2; want=0}' \
-    | while IFS= read -r rpath; do
-        case "$rpath" in
-            /Applications/Xcode*.app/*|/Library/Developer/CommandLineTools/*)
-                log "  removing host RPATH: $rpath"
-                /usr/bin/install_name_tool -delete_rpath "$rpath" "$MACOS/$APP_NAME"
-                ;;
-        esac
-    done
+strip_host_rpaths "$MACOS/$APP_NAME"
+strip_host_rpaths "$LAUNCH_DAEMONS/$HELPER_NAME"
 # Point dyld at the embedded Frameworks directory so @rpath/Sparkle.framework
 # resolves to Contents/Frameworks/Sparkle.framework.
 /usr/bin/install_name_tool -add_rpath "@executable_path/../Frameworks" "$MACOS/$APP_NAME"
@@ -386,6 +433,10 @@ done
 sign_if_present "$SPARKLE_CURRENT/Autoupdate"
 sign_if_present "$SPARKLE_CURRENT/Updater.app"
 /usr/bin/codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$SPARKLE_DST"
+
+log "Signing closed-lid helper bottom-up"
+/usr/bin/codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" --identifier "$HELPER_BUNDLE_ID" "$LAUNCH_DAEMONS/$HELPER_NAME"
+/usr/bin/codesign --verify --strict --verbose=2 "$LAUNCH_DAEMONS/$HELPER_NAME"
 
 log "Signing app with Developer ID and hardened runtime"
 /usr/bin/codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$APP"
