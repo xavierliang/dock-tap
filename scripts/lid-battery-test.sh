@@ -8,8 +8,10 @@ ROOT_DIR="$HOME/Desktop/lid-test"
 RUN_DIR=""
 HEARTBEAT_PID=""
 CAFFEINATE_PID=""
+SUDO_KEEPALIVE_PID=""
 DISABLESLEEP_ACTIVE=0
 INTERVAL_SECONDS=10
+SUDO_KEEPALIVE_INTERVAL_SECONDS=60
 
 usage() {
     cat <<'EOF'
@@ -120,6 +122,22 @@ stop_child() {
     fi
 }
 
+start_sudo_keepalive() {
+    while true; do
+        sudo -n -v >/dev/null 2>&1 || exit 0
+        sleep "$SUDO_KEEPALIVE_INTERVAL_SECONDS"
+    done &
+    SUDO_KEEPALIVE_PID=$!
+}
+
+warn_manual_disablesleep_restore() {
+    cat >&2 <<'EOF'
+lid-battery-test: WARNING: could not restore disablesleep automatically because sudo credentials are unavailable.
+Run this command manually now to restore normal sleep behavior:
+  sudo pmset -a disablesleep 0
+EOF
+}
+
 cleanup() {
     local status=$?
     trap - EXIT HUP INT TERM
@@ -129,10 +147,12 @@ cleanup() {
 
     if [[ "$DISABLESLEEP_ACTIVE" == "1" ]]; then
         if ! sudo -n pmset -a disablesleep 0 >/dev/null 2>&1; then
-            sudo pmset -a disablesleep 0 >/dev/null || printf 'lid-battery-test: WARNING: failed to restore disablesleep 0\n' >&2
+            warn_manual_disablesleep_restore
         fi
         DISABLESLEEP_ACTIVE=0
     fi
+
+    stop_child "$SUDO_KEEPALIVE_PID"
 
     if [[ -n "$RUN_DIR" ]]; then
         record_pmset "$RUN_DIR/pmset-after.txt"
@@ -187,6 +207,7 @@ run_baseline() {
 
 run_disablesleep() {
     sudo -v
+    start_sudo_keepalive
     sudo pmset -a disablesleep 1
     DISABLESLEEP_ACTIVE=1
     run_baseline
