@@ -18,6 +18,7 @@ enum ClosedLidHelperPreparationResult: Equatable {
     case ready
     case requiresApproval
     case notFound(String)
+    case unsafeActiveSession(String)
     case failure(String)
 }
 
@@ -70,7 +71,7 @@ protocol ClosedLidHelperClienting: AnyObject {
 
 private enum ReregistrationReadiness {
     case inactiveOrRestored
-    case blocked(String)
+    case blocked(ClosedLidHelperPreparationResult)
 }
 
 final class ClosedLidHelperClient: ClosedLidHelperClienting {
@@ -248,8 +249,8 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
         switch proveOldHelperInactiveOrRestored() {
         case .inactiveOrRestored:
             invalidate()
-        case .blocked(let message):
-            return .failure(message)
+        case .blocked(let result):
+            return result
         }
 
         do {
@@ -363,7 +364,7 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
     }
 
     private func reregistrationBlocked(_ message: String) -> ReregistrationReadiness {
-        .blocked("\(message). \(AppText.ClosedLid.manualRecovery)")
+        .blocked(.unsafeActiveSession(message))
     }
 
     private func resultAfterRegistration() -> ClosedLidHelperPreparationResult {

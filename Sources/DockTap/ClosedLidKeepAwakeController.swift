@@ -113,6 +113,18 @@ final class ClosedLidKeepAwakeController {
                 }
                 self.state = .error(message)
                 self.logStore.append("closed-lid helper preparation failed: \(message)")
+            case .unsafeActiveSession(let message):
+                if self.finishDeferredStopWithRestoreRequired(
+                    message: message,
+                    logMessage: "closed-lid helper preparation could not confirm restore while stop pending: \(message)"
+                ) {
+                    return
+                }
+                self.clearActiveSession()
+                self.state = .stopFailed(message)
+                self.logStore.append(
+                    "closed-lid helper preparation could not confirm restore: \(message); \(AppText.ClosedLid.manualRecovery)"
+                )
             }
         }
     }
@@ -363,6 +375,27 @@ final class ClosedLidKeepAwakeController {
             completeStop(success: true, message: nil)
         } else {
             state = .off
+        }
+        return true
+    }
+
+    private func finishDeferredStopWithRestoreRequired(message: String, logMessage: String) -> Bool {
+        guard stopRequestedDuringStart || isStopInFlight else {
+            return false
+        }
+
+        stopRequestedDuringStart = false
+        clearActiveSession()
+        logStore.append(logMessage)
+
+        if isStopInFlight {
+            completeStop(success: false, message: message)
+        } else {
+            state = .stopFailed(message)
+            logStore.append("closed-lid deferred stop failed: \(message); \(AppText.ClosedLid.manualRecovery)")
+            if stopFailureAlertRequested {
+                showStopFailureAlert(message: message)
+            }
         }
         return true
     }

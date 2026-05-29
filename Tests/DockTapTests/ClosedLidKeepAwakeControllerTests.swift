@@ -267,6 +267,30 @@ final class ClosedLidKeepAwakeControllerTests: XCTestCase {
         assertDeferredStopDuringPendingPrepareCompletesSuccessfully(.failure("registration failed"))
     }
 
+    func testStopBeforeTerminationDuringPendingPrepareCancelsWhenRestoreIsRequired() {
+        settingsStore.hasSeenClosedLidWarning = true
+        helperClient.prepareResults = []
+        let message = "old helper stop failed: restore failed"
+
+        controller.enableForOneHour()
+
+        var completion: (success: Bool, message: String?)?
+        controller.stopBeforeTermination(reason: "update") { success, message in
+            completion = (success, message)
+        }
+
+        helperClient.completePendingPrepare(.unsafeActiveSession(message))
+
+        XCTAssertEqual(completion?.success, false)
+        XCTAssertEqual(completion?.message, message)
+        XCTAssertEqual(controller.state, .stopFailed(message))
+        XCTAssertTrue(helperClient.startDurations.isEmpty)
+        XCTAssertTrue(helperClient.stopTokens.isEmpty)
+        XCTAssertEqual(AlertRunModalStub.alerts.last?.messageText, AppText.ClosedLid.stopFailureTitle)
+        XCTAssertTrue(AlertRunModalStub.alerts.last?.informativeText.contains("sudo pmset -a disablesleep 0") == true)
+        XCTAssertTrue(logStore.entries.contains { $0.text.contains("sudo pmset -a disablesleep 0") })
+    }
+
     func testRenewalFailurePreservesStopNowToken() {
         settingsStore.hasSeenClosedLidWarning = true
         helperClient.startResults.append(.started(.indefinite(token: "renew-token")))

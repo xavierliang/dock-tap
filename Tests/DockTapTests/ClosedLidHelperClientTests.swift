@@ -152,37 +152,35 @@ final class ClosedLidHelperClientTests: XCTestCase {
         XCTAssertNotEqual(defaults.string(forKey: "closedLidHelperRegisteredGeneration"), "old-generation")
     }
 
-    func testReregisterBlocksWhenOldHelperStatusFails() {
+    func testReregisterReturnsUnsafeActiveSessionWhenOldHelperStatusFails() {
         defaults.set("old-generation", forKey: "closedLidHelperRegisteredGeneration")
         reregistrationStatusResults = [.failure("xpc unavailable")]
 
         let result = prepareForUse()
 
-        guard case .failure(let message) = result else {
-            XCTFail("Expected failure, got \(result)")
+        guard case .unsafeActiveSession(let message) = result else {
+            XCTFail("Expected unsafe active session, got \(result)")
             return
         }
         XCTAssertTrue(message.contains("could not verify old helper status"))
-        XCTAssertTrue(message.contains("sudo pmset -a disablesleep 0"))
         XCTAssertEqual(reregistrationEvents, ["status"])
         XCTAssertEqual(service.unregisterCallCount, 0)
         XCTAssertEqual(service.registerCallCount, 0)
         XCTAssertEqual(defaults.string(forKey: "closedLidHelperRegisteredGeneration"), "old-generation")
     }
 
-    func testReregisterBlocksWhenActiveOldHelperCannotStop() {
+    func testReregisterReturnsUnsafeActiveSessionWhenActiveOldHelperCannotStop() {
         defaults.set("old-generation", forKey: "closedLidHelperRegisteredGeneration")
         reregistrationStatusResults = [.active(.indefinite(token: "old-token"))]
         reregistrationStopResults = [.failure("restore failed")]
 
         let result = prepareForUse()
 
-        guard case .failure(let message) = result else {
-            XCTFail("Expected failure, got \(result)")
+        guard case .unsafeActiveSession(let message) = result else {
+            XCTFail("Expected unsafe active session, got \(result)")
             return
         }
         XCTAssertTrue(message.contains("old helper stop failed"))
-        XCTAssertTrue(message.contains("sudo pmset -a disablesleep 0"))
         XCTAssertEqual(reregistrationStopTokens, ["old-token"])
         XCTAssertEqual(reregistrationEvents, ["status", "stop"])
         XCTAssertEqual(service.unregisterCallCount, 0)
