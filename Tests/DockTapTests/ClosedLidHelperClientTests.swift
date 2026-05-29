@@ -13,6 +13,8 @@ final class ClosedLidHelperClientTests: XCTestCase {
     private var reregistrationStopTokens: [String]!
     private var reregistrationStopReasons: [String]!
     private var reregistrationEvents: [String]!
+    private var sleepDisabledResult: Bool?
+    private var sleepDisabledReadCount: Int!
 
     override func setUp() {
         super.setUp()
@@ -25,6 +27,8 @@ final class ClosedLidHelperClientTests: XCTestCase {
         reregistrationStopTokens = []
         reregistrationStopReasons = []
         reregistrationEvents = []
+        sleepDisabledResult = nil
+        sleepDisabledReadCount = 0
         service.eventRecorder = { [weak self] event in
             self?.reregistrationEvents.append(event)
         }
@@ -49,6 +53,13 @@ final class ClosedLidHelperClientTests: XCTestCase {
                     return
                 }
                 completion(self.reregistrationStopResults.removeFirstOrDefault(.stopped))
+            },
+            sleepDisabledReader: { [weak self] in
+                guard let self else {
+                    return nil
+                }
+                self.sleepDisabledReadCount += 1
+                return self.sleepDisabledResult
             }
         )
     }
@@ -65,6 +76,8 @@ final class ClosedLidHelperClientTests: XCTestCase {
         reregistrationStopTokens = nil
         reregistrationStopReasons = nil
         reregistrationEvents = nil
+        sleepDisabledResult = nil
+        sleepDisabledReadCount = nil
         super.tearDown()
     }
 
@@ -211,7 +224,86 @@ final class ClosedLidHelperClientTests: XCTestCase {
         XCTAssertNotEqual(defaults.string(forKey: "closedLidHelperRegisteredGeneration"), "old-generation")
     }
 
-    func testReregisterReturnsUnsafeActiveSessionWhenOldHelperStatusFails() {
+    func testStatusRepairsStaleGenerationWhenOldHelperStatusFailsAndSleepDisabledIsOff() {
+        defaults.set("old-generation", forKey: "closedLidHelperRegisteredGeneration")
+        reregistrationStatusResults = [.failure("xpc unavailable")]
+        sleepDisabledResult = false
+
+        let result = status()
+
+        XCTAssertEqual(result, .inactive)
+        XCTAssertEqual(reregistrationEvents, ["status", "unregister", "register"])
+        XCTAssertEqual(service.unregisterCallCount, 1)
+        XCTAssertEqual(service.registerCallCount, 1)
+        XCTAssertEqual(sleepDisabledReadCount, 1)
+        XCTAssertNotEqual(defaults.string(forKey: "closedLidHelperRegisteredGeneration"), "old-generation")
+        XCTAssertNotNil(defaults.string(forKey: "closedLidHelperRegisteredGeneration"))
+    }
+
+    func testPrepareRepairsStaleGenerationWhenOldHelperStatusFailsAndSleepDisabledIsOff() {
+        defaults.set("old-generation", forKey: "closedLidHelperRegisteredGeneration")
+        reregistrationStatusResults = [.failure("xpc unavailable")]
+        sleepDisabledResult = false
+
+        let result = prepareForUse()
+
+        XCTAssertEqual(result, .ready)
+        XCTAssertEqual(reregistrationEvents, ["status", "unregister", "register"])
+        XCTAssertEqual(service.unregisterCallCount, 1)
+        XCTAssertEqual(service.registerCallCount, 1)
+        XCTAssertEqual(sleepDisabledReadCount, 1)
+        XCTAssertNotEqual(defaults.string(forKey: "closedLidHelperRegisteredGeneration"), "old-generation")
+        XCTAssertNotNil(defaults.string(forKey: "closedLidHelperRegisteredGeneration"))
+    }
+
+    func testStopWithoutTokenRepairsStaleGenerationWhenOldHelperStatusFailsAndSleepDisabledIsOff() {
+        defaults.set("old-generation", forKey: "closedLidHelperRegisteredGeneration")
+        reregistrationStatusResults = [.failure("xpc unavailable")]
+        sleepDisabledResult = false
+
+        let result = stop(token: nil)
+
+        XCTAssertEqual(result, .stopped)
+        XCTAssertEqual(reregistrationEvents, ["status", "unregister", "register"])
+        XCTAssertEqual(service.unregisterCallCount, 1)
+        XCTAssertEqual(service.registerCallCount, 1)
+        XCTAssertEqual(sleepDisabledReadCount, 1)
+        XCTAssertNotEqual(defaults.string(forKey: "closedLidHelperRegisteredGeneration"), "old-generation")
+    }
+
+    func testStatusRepairCompletesWithoutRecursiveDeadlock() {
+        defaults.set("old-generation", forKey: "closedLidHelperRegisteredGeneration")
+        reregistrationStatusResults = [.inactive]
+
+        let result = status()
+
+        XCTAssertEqual(result, .inactive)
+        XCTAssertEqual(reregistrationEvents, ["status", "unregister", "register"])
+        XCTAssertEqual(service.unregisterCallCount, 1)
+        XCTAssertEqual(service.registerCallCount, 1)
+    }
+
+    func testReregisterReturnsUnsafeActiveSessionWhenOldHelperStatusFailsAndSleepDisabledIsOn() {
+        defaults.set("old-generation", forKey: "closedLidHelperRegisteredGeneration")
+        reregistrationStatusResults = [.failure("xpc unavailable")]
+        sleepDisabledResult = true
+
+        let result = prepareForUse()
+
+        guard case .unsafeActiveSession(let message) = result else {
+            XCTFail("Expected unsafe active session, got \(result)")
+            return
+        }
+        XCTAssertTrue(message.contains("could not verify old helper status"))
+        XCTAssertTrue(message.contains("SleepDisabled is still on"))
+        XCTAssertEqual(reregistrationEvents, ["status"])
+        XCTAssertEqual(service.unregisterCallCount, 0)
+        XCTAssertEqual(service.registerCallCount, 0)
+        XCTAssertEqual(sleepDisabledReadCount, 1)
+        XCTAssertEqual(defaults.string(forKey: "closedLidHelperRegisteredGeneration"), "old-generation")
+    }
+
+    func testReregisterReturnsUnsafeActiveSessionWhenOldHelperStatusFailsAndSleepDisabledIsUnknown() {
         defaults.set("old-generation", forKey: "closedLidHelperRegisteredGeneration")
         reregistrationStatusResults = [.failure("xpc unavailable")]
 
@@ -222,9 +314,11 @@ final class ClosedLidHelperClientTests: XCTestCase {
             return
         }
         XCTAssertTrue(message.contains("could not verify old helper status"))
+        XCTAssertTrue(message.contains("Could not verify SleepDisabled is off"))
         XCTAssertEqual(reregistrationEvents, ["status"])
         XCTAssertEqual(service.unregisterCallCount, 0)
         XCTAssertEqual(service.registerCallCount, 0)
+        XCTAssertEqual(sleepDisabledReadCount, 1)
         XCTAssertEqual(defaults.string(forKey: "closedLidHelperRegisteredGeneration"), "old-generation")
     }
 
@@ -319,6 +413,47 @@ final class ClosedLidHelperClientTests: XCTestCase {
         wait(for: [exp], timeout: 2)
         guard let result else {
             XCTFail("prepareForUse did not complete", file: file, line: line)
+            return .failure("missing test result")
+        }
+        return result
+    }
+
+    private func status(
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> ClosedLidHelperStatusResult {
+        let exp = expectation(description: "status completes")
+        var result: ClosedLidHelperStatusResult?
+
+        client.status {
+            result = $0
+            exp.fulfill()
+        }
+
+        wait(for: [exp], timeout: 2)
+        guard let result else {
+            XCTFail("status did not complete", file: file, line: line)
+            return .failure("missing test result")
+        }
+        return result
+    }
+
+    private func stop(
+        token: String?,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> ClosedLidHelperStopResult {
+        let exp = expectation(description: "stop completes")
+        var result: ClosedLidHelperStopResult?
+
+        client.stop(token: token, reason: "test") {
+            result = $0
+            exp.fulfill()
+        }
+
+        wait(for: [exp], timeout: 2)
+        guard let result else {
+            XCTFail("stop did not complete", file: file, line: line)
             return .failure("missing test result")
         }
         return result
