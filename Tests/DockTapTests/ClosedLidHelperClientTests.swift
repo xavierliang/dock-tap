@@ -105,6 +105,32 @@ final class ClosedLidHelperClientTests: XCTestCase {
         )
     }
 
+    func testPrepareRegistersWhenServiceStatusIsNotFound() {
+        service.status = .notFound
+
+        let result = prepareForUse()
+
+        XCTAssertEqual(result, .ready)
+        XCTAssertEqual(service.registerCallCount, 1)
+        XCTAssertEqual(service.unregisterCallCount, 0)
+        XCTAssertNotNil(defaults.string(forKey: "closedLidHelperRegisteredGeneration"))
+    }
+
+    func testPrepareReturnsNotFoundAfterRegisterWhenStatusRemainsNotFound() {
+        service.status = .notFound
+        service.statusAfterRegister = .notFound
+
+        let result = prepareForUse()
+
+        guard case .notFound(let message) = result else {
+            XCTFail("Expected notFound, got \(result)")
+            return
+        }
+        XCTAssertTrue(message.contains("helper LaunchDaemon plist"))
+        XCTAssertEqual(service.registerCallCount, 1)
+        XCTAssertEqual(service.unregisterCallCount, 0)
+    }
+
     func testReregisterFailsWhenUnregisterFails() {
         defaults.set("old-generation", forKey: "closedLidHelperRegisteredGeneration")
         service.unregisterError = NSError(domain: "DockTapTests", code: 47)
@@ -211,6 +237,7 @@ final class ClosedLidHelperClientTests: XCTestCase {
 
 private final class FakeClosedLidService: ClosedLidServiceManaging {
     var status: SMAppService.Status
+    var statusAfterRegister: SMAppService.Status = .enabled
     var registerError: Error?
     var unregisterError: Error?
     var eventRecorder: ((String) -> Void)?
@@ -228,7 +255,7 @@ private final class FakeClosedLidService: ClosedLidServiceManaging {
         if let registerError {
             throw registerError
         }
-        status = .enabled
+        status = statusAfterRegister
     }
 
     func unregister() throws {

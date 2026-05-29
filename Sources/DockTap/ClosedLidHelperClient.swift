@@ -224,12 +224,10 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
                 return reregisterHelper()
             }
             return .ready
-        case .notRegistered:
+        case .notRegistered, .notFound:
             return registerHelper()
         case .requiresApproval:
             return .requiresApproval
-        case .notFound:
-            return .notFound("helper LaunchDaemon plist was not found in the app bundle")
         @unknown default:
             return .failure("helper status is unknown")
         }
