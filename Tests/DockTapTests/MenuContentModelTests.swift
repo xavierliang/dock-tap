@@ -237,7 +237,8 @@ final class MenuContentModelTests: XCTestCase {
 
         XCTAssertEqual(starting.statusTitle, "Starting…")
         XCTAssertFalse(starting.enableOneHourIsEnabled)
-        XCTAssertTrue(starting.stopNowIsEnabled)
+        XCTAssertFalse(starting.stopNowIsEnabled)
+        XCTAssertTrue(ClosedLidKeepAwakeState.starting.canStopSession)
 
         XCTAssertEqual(stopping.statusTitle, "Stopping…")
         XCTAssertFalse(stopping.enableIndefinitelyIsEnabled)

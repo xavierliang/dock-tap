@@ -140,6 +140,42 @@ final class ClosedLidKeepAwakeControllerTests: XCTestCase {
         XCTAssertEqual(AlertRunModalStub.alerts.map(\.messageText), [AppText.ClosedLid.helperApprovalRequired])
     }
 
+    func testApprovalFollowUpStartsRequestedSessionAfterHelperBecomesReady() {
+        settingsStore.hasSeenClosedLidWarning = true
+        let endDate = Date(timeIntervalSinceReferenceDate: 10_500)
+        helperClient.prepareResults = [.requiresApproval, .ready]
+        helperClient.startResults.append(.started(.timed(token: "approved-token", endDate: endDate)))
+        AlertRunModalStub.response = .alertFirstButtonReturn
+
+        controller.enableForOneHour()
+
+        XCTAssertEqual(helperClient.prepareCallCount, 2)
+        XCTAssertEqual(helperClient.startDurations.count, 1)
+        XCTAssertEqual(helperClient.startDurations[0], 3_600)
+        XCTAssertEqual(helperClient.openApprovalSettingsCallCount, 1)
+        XCTAssertEqual(AlertRunModalStub.alerts.map(\.messageText), [AppText.ClosedLid.helperApprovalRequired])
+        XCTAssertActiveTimed(endDate, controller.state)
+    }
+
+    func testApprovalFollowUpDoesNotRepeatApprovalAlertForSameEnableRequest() {
+        settingsStore.hasSeenClosedLidWarning = true
+        let endDate = Date(timeIntervalSinceReferenceDate: 11_500)
+        helperClient.prepareResults = [.requiresApproval, .ready, .ready]
+        helperClient.startResults.append(.requiresApproval)
+        helperClient.startResults.append(.started(.timed(token: "approved-token", endDate: endDate)))
+        AlertRunModalStub.response = .alertFirstButtonReturn
+
+        controller.enableForOneHour()
+
+        XCTAssertEqual(helperClient.prepareCallCount, 3)
+        XCTAssertEqual(helperClient.startDurations.count, 2)
+        XCTAssertEqual(helperClient.startDurations[0], 3_600)
+        XCTAssertEqual(helperClient.startDurations[1], 3_600)
+        XCTAssertEqual(helperClient.openApprovalSettingsCallCount, 1)
+        XCTAssertEqual(AlertRunModalStub.alerts.map(\.messageText), [AppText.ClosedLid.helperApprovalRequired])
+        XCTAssertActiveTimed(endDate, controller.state)
+    }
+
     func testRefreshStatusMirrorsActiveAndInactiveHelperStates() {
         let endDate = Date(timeIntervalSinceReferenceDate: 10_000)
         helperClient.statusResults.append(.active(.timed(token: "status-token", endDate: endDate)))
@@ -147,6 +183,17 @@ final class ClosedLidKeepAwakeControllerTests: XCTestCase {
 
         controller.refreshStatus()
         XCTAssertActiveTimed(endDate, controller.state)
+
+        controller.refreshStatus()
+        XCTAssertEqual(controller.state, .off)
+    }
+
+    func testRefreshStatusReconcilesApprovalStateAfterHelperNoLongerRequiresApproval() {
+        helperClient.statusResults.append(.requiresApproval)
+        helperClient.statusResults.append(.inactive)
+
+        controller.refreshStatus()
+        XCTAssertEqual(controller.state, .requiresApproval)
 
         controller.refreshStatus()
         XCTAssertEqual(controller.state, .off)

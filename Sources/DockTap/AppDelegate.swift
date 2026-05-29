@@ -189,6 +189,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard menu === statusMenu else {
             return
         }
+        closedLidController.refreshStatus()
         refreshDock(reason: "menu")
     }
 

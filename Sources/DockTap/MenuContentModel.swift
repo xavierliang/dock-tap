@@ -165,7 +165,7 @@ struct MenuContentModel: Equatable {
             enableIndefinitelyIsEnabled: enableCommandsAreEnabled,
             enableIndefinitelyIsChecked: state.isIndefinite,
             stopNowTitle: AppText.ClosedLid.stopNow,
-            stopNowIsEnabled: state.canStopSession,
+            stopNowIsEnabled: state.canStopFromMenu,
             openApprovalSettingsTitle: state == .requiresApproval ? AppText.ClosedLid.openLoginItemsSettings : nil
         )
     }
@@ -196,6 +196,15 @@ enum ClosedLidKeepAwakeState: Equatable {
         case .activeTimed, .activeIndefinite, .starting, .errorWithActiveSession, .stopFailed:
             return true
         case .off, .stopping, .requiresApproval, .error:
+            return false
+        }
+    }
+
+    var canStopFromMenu: Bool {
+        switch self {
+        case .activeTimed, .activeIndefinite, .errorWithActiveSession, .stopFailed:
+            return true
+        case .off, .starting, .stopping, .requiresApproval, .error:
             return false
         }
     }
