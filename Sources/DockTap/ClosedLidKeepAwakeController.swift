@@ -242,6 +242,10 @@ final class ClosedLidKeepAwakeController {
         case .failureWithActiveSession(let session, let message):
             applyActiveSessionError(session, message: message)
             logStore.append("closed-lid status failed with active lease: \(message)")
+        case .unsafeActiveSession(let message):
+            clearActiveSession()
+            state = .stopFailed(message)
+            logStore.append("closed-lid status could not confirm restore: \(message); \(AppText.ClosedLid.manualRecovery)")
         case .requiresApproval:
             clearActiveSession()
             state = .requiresApproval

@@ -315,6 +315,17 @@ final class ClosedLidKeepAwakeControllerTests: XCTestCase {
         XCTAssertEqual(controller.state, .off)
     }
 
+    func testRefreshStatusUnsafeActiveSessionShowsStopFailedManualRecoveryState() {
+        let message = "helper re-registration blocked: could not verify old helper status"
+        helperClient.statusResults.append(.unsafeActiveSession(message))
+
+        controller.refreshStatus()
+
+        XCTAssertEqual(controller.state, .stopFailed(message))
+        XCTAssertTrue(controller.state.canStopFromMenu)
+        XCTAssertTrue(logStore.entries.contains { $0.text.contains(AppText.ClosedLid.manualRecovery) })
+    }
+
     func testStopBeforeTerminationAllowsQuitOnlyAfterHelperConfirmsRestore() {
         settingsStore.hasSeenClosedLidWarning = true
         helperClient.startResults.append(.started(.timed(token: "quit-token", endDate: Date())))

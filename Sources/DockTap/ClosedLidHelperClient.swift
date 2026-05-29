@@ -47,6 +47,7 @@ enum ClosedLidHelperStatusResult: Equatable {
     case inactive
     case active(ClosedLidHelperSession)
     case failureWithActiveSession(ClosedLidHelperSession, String)
+    case unsafeActiveSession(String)
     case requiresApproval
     case failure(String)
 }
@@ -146,6 +147,7 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
     private let defaults: UserDefaults
     private let logStore: LogStore
     private let rawStatusProvider: ((@escaping (ClosedLidHelperStatusResult) -> Void) -> Void)?
+    private let rawStopProvider: ((String, String, @escaping (ClosedLidHelperStopResult) -> Void) -> Void)?
     private let reregistrationStatusProvider: ((@escaping (ClosedLidHelperStatusResult) -> Void) -> Void)?
     private let reregistrationStopper: ((String, String, @escaping (ClosedLidHelperStopResult) -> Void) -> Void)?
     private let sleepDisabledReader: () -> Bool?
@@ -159,6 +161,7 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
         defaults: UserDefaults = .standard,
         logStore: LogStore,
         rawStatusProvider: ((@escaping (ClosedLidHelperStatusResult) -> Void) -> Void)? = nil,
+        rawStopProvider: ((String, String, @escaping (ClosedLidHelperStopResult) -> Void) -> Void)? = nil,
         reregistrationStatusProvider: ((@escaping (ClosedLidHelperStatusResult) -> Void) -> Void)? = nil,
         reregistrationStopper: ((String, String, @escaping (ClosedLidHelperStopResult) -> Void) -> Void)? = nil,
         sleepDisabledReader: @escaping () -> Bool? = { PmsetSleepDisabledReader().sleepDisabled() },
@@ -168,6 +171,7 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
         self.defaults = defaults
         self.logStore = logStore
         self.rawStatusProvider = rawStatusProvider
+        self.rawStopProvider = rawStopProvider
         self.reregistrationStatusProvider = reregistrationStatusProvider
         self.reregistrationStopper = reregistrationStopper
         self.sleepDisabledReader = sleepDisabledReader
@@ -225,6 +229,8 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
                     self?.stop(token: session.token, reason: reason, completion: completion)
                 case .failureWithActiveSession(let session, _):
                     self?.stop(token: session.token, reason: reason, completion: completion)
+                case .unsafeActiveSession(let message):
+                    completion(.failure(message))
                 case .requiresApproval:
                     completion(.requiresApproval)
                 case .failure(let message):
@@ -261,6 +267,11 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
         reason: String,
         completion: @escaping (ClosedLidHelperStopResult) -> Void
     ) {
+        if let rawStopProvider {
+            rawStopProvider(token, reason, completion)
+            return
+        }
+
         guard let proxy = helperProxy(errorHandler: { error in
             completion(.failure("helper stop failed: \(error.localizedDescription)"))
         }) else {
@@ -435,6 +446,8 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
         case .failureWithActiveSession(let session, let message):
             logStore.append("closed-lid helper re-registration status failed with active session: \(message)")
             return stopOldHelperBeforeReregistration(session)
+        case .unsafeActiveSession(let message):
+            return reregistrationBlocked(message)
         case .requiresApproval:
             return reregistrationBlocked("helper re-registration blocked: old helper requires approval before it can be stopped")
         case .failure(let message):
@@ -584,7 +597,7 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
             if let activeSession = outcome.activeSession {
                 return .failureWithActiveSession(activeSession, message)
             }
-            return .failure(message)
+            return .unsafeActiveSession(message)
         case .notFound(let message), .failure(let message):
             return .failure(message)
         }
