@@ -5,7 +5,6 @@ final class SettingsStore {
         static let triggerModifierPreset = "triggerModifierPreset"
         static let windowActionsEnabled = "windowActionsEnabled"
         static let hasSeenClosedLidWarning = "hasSeenClosedLidWarning"
-        static let dimInternalDisplayOnLidClose = "dimInternalDisplayOnLidClose"
     }
 
     private let defaults: UserDefaults
@@ -41,17 +40,6 @@ final class SettingsStore {
         }
         set {
             defaults.set(newValue, forKey: Keys.hasSeenClosedLidWarning)
-        }
-    }
-
-    /// 合盖时是否自动把内置屏调暗（开盖恢复）。默认开启；
-    /// `defaults.bool` 未设置时返回 false，故用 object 判定以便缺省回落到 true。
-    var dimInternalDisplayOnLidClose: Bool {
-        get {
-            defaults.object(forKey: Keys.dimInternalDisplayOnLidClose) as? Bool ?? true
-        }
-        set {
-            defaults.set(newValue, forKey: Keys.dimInternalDisplayOnLidClose)
         }
     }
 }

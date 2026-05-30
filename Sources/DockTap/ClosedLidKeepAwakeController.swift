@@ -124,18 +124,6 @@ final class ClosedLidKeepAwakeController {
         helperClient.invalidate()
     }
 
-    /// 设置项"合盖时调暗内置屏"被切换时由 AppDelegate 调用，重新评估当前是否该监听。
-    func reevaluateLidDimming() {
-        guard stateHoldsSession(state) else {
-            return
-        }
-        if settingsStore.dimInternalDisplayOnLidClose {
-            beginLidDimmingIfEnabled()
-        } else {
-            endLidDimming()
-        }
-    }
-
     private func start(duration: TimeInterval?, logMode: String) {
         guard state.canStartSession else {
             logStore.append("closed-lid start ignored state=\(state.logValue)")
@@ -721,7 +709,7 @@ final class ClosedLidKeepAwakeController {
 
     // MARK: - 合盖压暗 / 开盖恢复
     //
-    // 仅在 keep-awake 会话持有 lease（系统被阻止睡眠）、且设置开启时生效；
+    // 仅在 keep-awake 会话持有 lease（系统被阻止睡眠）时生效；
     // 其余状态完全不监听、不动亮度。生命周期由 state 变化驱动，确保任何结束
     // 路径（Stop Now、超时、崩溃、退出）都会恢复亮度。
 
@@ -740,7 +728,7 @@ final class ClosedLidKeepAwakeController {
         let was = stateHoldsSession(oldState)
         let now = stateHoldsSession(newState)
         if !was, now {
-            beginLidDimmingIfEnabled()
+            beginLidDimming()
         } else if was, !now {
             endLidDimming()
         }
@@ -748,10 +736,7 @@ final class ClosedLidKeepAwakeController {
 
     /// 会话激活时开始监听合盖，并对齐当前状态（用户可能在启动前/启动时就已合盖）。
     /// `LidStateObserver.start()` 自身幂等，重复调用安全。
-    private func beginLidDimmingIfEnabled() {
-        guard settingsStore.dimInternalDisplayOnLidClose else {
-            return
-        }
+    private func beginLidDimming() {
         lidObserver.start()
         if lidObserver.isLidCurrentlyClosed() {
             dimForLidClosed()
@@ -765,7 +750,7 @@ final class ClosedLidKeepAwakeController {
     }
 
     private func handleLidStateChanged(closed: Bool) {
-        guard stateHoldsSession(state), settingsStore.dimInternalDisplayOnLidClose else {
+        guard stateHoldsSession(state) else {
             return
         }
         if closed {
@@ -783,8 +768,8 @@ final class ClosedLidKeepAwakeController {
             logStore.append("closed-lid dim skipped: could not read built-in brightness")
             return
         }
-        savedBrightness = current
         if brightnessController.setInternalBrightness(0) {
+            savedBrightness = current
             logStore.append("closed-lid dimmed built-in display (was \(String(format: "%.2f", current)))")
         } else {
             logStore.append("closed-lid dim failed to set brightness")

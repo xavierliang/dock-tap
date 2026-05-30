@@ -90,14 +90,12 @@ private final class StubHelperClient: ClosedLidHelperClienting {
 
 final class LidCloseDimmingTests: XCTestCase {
     private func makeController(
-        dimEnabled: Bool = true,
         brightness: FakeBrightnessController = FakeBrightnessController(),
         lid: FakeLidObserver = FakeLidObserver()
     ) -> (ClosedLidKeepAwakeController, FakeBrightnessController, FakeLidObserver, SettingsStore) {
         let defaults = UserDefaults(suiteName: "LidCloseDimmingTests-\(UUID().uuidString)")!
         let settings = SettingsStore(defaults: defaults)
         settings.hasSeenClosedLidWarning = true
-        settings.dimInternalDisplayOnLidClose = dimEnabled
         let controller = ClosedLidKeepAwakeController(
             settingsStore: settings,
             helperClient: StubHelperClient(
@@ -122,15 +120,6 @@ final class LidCloseDimmingTests: XCTestCase {
 
         lid.emit(closed: false)
         XCTAssertEqual(brightness.setValues, [0.0, 0.8], "lid open should restore saved brightness")
-    }
-
-    func testDimSkippedWhenSettingDisabled() {
-        let (controller, brightness, lid, _) = makeController(dimEnabled: false)
-        controller.enableIndefinitely()
-        XCTAssertEqual(lid.startCount, 0, "observation should not start when setting disabled")
-
-        lid.emit(closed: true)
-        XCTAssertTrue(brightness.setValues.isEmpty, "no brightness change when setting disabled")
     }
 
     func testSessionStopRestoresWhenStillDimmed() {
@@ -169,6 +158,25 @@ final class LidCloseDimmingTests: XCTestCase {
         lid.emit(closed: true)
         lid.emit(closed: false)
         XCTAssertEqual(brightness.setValues, [0.0, 0.8], "restore must use first saved value, not re-saved 0")
+    }
+
+    func testFailedDimDoesNotMarkBrightnessAsSavedAndCanRetry() {
+        let brightness = FakeBrightnessController()
+        brightness.setSucceeds = false
+        let (controller, _, lid, _) = makeController(brightness: brightness)
+        controller.enableIndefinitely()
+
+        lid.emit(closed: true)
+        XCTAssertEqual(brightness.setValues, [0.0], "first close should attempt to dim")
+
+        brightness.setSucceeds = true
+        lid.emit(closed: true)
+        lid.emit(closed: false)
+        XCTAssertEqual(
+            brightness.setValues,
+            [0.0, 0.0, 0.8],
+            "failed dim must not block retry or restore a brightness that was never changed"
+        )
     }
 }
 
