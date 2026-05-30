@@ -144,6 +144,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         closedLidController.openApprovalSettings()
     }
 
+    @objc private func toggleClosedLidDim() {
+        let newValue = !settingsStore.dimInternalDisplayOnLidClose
+        settingsStore.dimInternalDisplayOnLidClose = newValue
+        closedLidController.reevaluateLidDimming()
+        logStore.append("closed-lid dim-on-lid-close \(newValue ? "enabled" : "disabled")")
+        rebuildMenu()
+    }
+
     @objc private func selectTriggerModifierPreset(_ sender: NSMenuItem) {
         guard
             let rawValue = sender.representedObject as? String,

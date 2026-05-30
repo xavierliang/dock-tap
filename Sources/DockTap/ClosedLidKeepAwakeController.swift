@@ -14,6 +14,7 @@ final class ClosedLidKeepAwakeController {
     private(set) var state: ClosedLidKeepAwakeState = .off {
         didSet {
             if oldValue != state {
+                reconcileLidDimming(from: oldValue, to: state)
                 onStateChanged?()
             }
         }
@@ -22,9 +23,14 @@ final class ClosedLidKeepAwakeController {
     private let settingsStore: SettingsStore
     private let helperClient: ClosedLidHelperClienting
     private let logStore: LogStore
+    private let brightnessController: BrightnessControlling
+    private let lidObserver: LidStateObserving
     private let approvalFollowUpMaxAttempts: Int
     private let approvalFollowUpRetryInterval: TimeInterval
     private let approvalFollowUpPrepareTimeout: TimeInterval
+
+    /// 合盖压暗前保存的亮度；非 nil 即表示"当前处于压暗状态"，用于幂等恢复。
+    private var savedBrightness: Double?
 
     private var renewalTimer: Timer?
     private var stopTimeoutTimer: Timer?
@@ -51,6 +57,8 @@ final class ClosedLidKeepAwakeController {
         settingsStore: SettingsStore,
         helperClient: ClosedLidHelperClienting,
         logStore: LogStore,
+        brightnessController: BrightnessControlling? = nil,
+        lidObserver: LidStateObserving? = nil,
         approvalFollowUpMaxAttempts: Int = ApprovalFollowUp.maxAttempts,
         approvalFollowUpRetryInterval: TimeInterval = ApprovalFollowUp.retryInterval,
         approvalFollowUpPrepareTimeout: TimeInterval = ApprovalFollowUp.prepareTimeout
@@ -58,9 +66,16 @@ final class ClosedLidKeepAwakeController {
         self.settingsStore = settingsStore
         self.helperClient = helperClient
         self.logStore = logStore
+        self.brightnessController = brightnessController
+            ?? BrightnessController(log: { logStore.append($0) })
+        self.lidObserver = lidObserver ?? LidStateObserver()
         self.approvalFollowUpMaxAttempts = approvalFollowUpMaxAttempts
         self.approvalFollowUpRetryInterval = approvalFollowUpRetryInterval
         self.approvalFollowUpPrepareTimeout = approvalFollowUpPrepareTimeout
+
+        self.lidObserver.onLidStateChanged = { [weak self] closed in
+            self?.handleLidStateChanged(closed: closed)
+        }
     }
 
     func refreshStatus() {
@@ -105,7 +120,20 @@ final class ClosedLidKeepAwakeController {
         renewalTimer?.invalidate()
         stopTimeoutTimer?.invalidate()
         cancelApprovalFollowUp()
+        endLidDimming()
         helperClient.invalidate()
+    }
+
+    /// 设置项"合盖时调暗内置屏"被切换时由 AppDelegate 调用，重新评估当前是否该监听。
+    func reevaluateLidDimming() {
+        guard stateHoldsSession(state) else {
+            return
+        }
+        if settingsStore.dimInternalDisplayOnLidClose {
+            beginLidDimmingIfEnabled()
+        } else {
+            endLidDimming()
+        }
     }
 
     private func start(duration: TimeInterval?, logMode: String) {
@@ -267,6 +295,7 @@ final class ClosedLidKeepAwakeController {
             state = .activeIndefinite
         }
         startRenewalTimer()
+        // 合盖监听由 state 的 didSet（reconcileLidDimming）统一驱动，此处不重复触发。
     }
 
     private func applyActiveSessionError(_ session: ClosedLidHelperSession, message: String) {
@@ -287,6 +316,7 @@ final class ClosedLidKeepAwakeController {
         activeToken = nil
         renewalTimer?.invalidate()
         renewalTimer = nil
+        // 合盖监听的结束同样由 state 的 didSet 统一驱动。
     }
 
     private func beginApprovalFollowUp(duration: TimeInterval?) {
@@ -687,6 +717,90 @@ final class ClosedLidKeepAwakeController {
         alert.alertStyle = .critical
         alert.addButton(withTitle: "OK")
         alert.runModal()
+    }
+
+    // MARK: - 合盖压暗 / 开盖恢复
+    //
+    // 仅在 keep-awake 会话持有 lease（系统被阻止睡眠）、且设置开启时生效；
+    // 其余状态完全不监听、不动亮度。生命周期由 state 变化驱动，确保任何结束
+    // 路径（Stop Now、超时、崩溃、退出）都会恢复亮度。
+
+    /// 该状态是否持有一个活动的 keep-awake lease（系统正被阻止睡眠）。
+    private func stateHoldsSession(_ state: ClosedLidKeepAwakeState) -> Bool {
+        switch state {
+        case .activeTimed, .activeIndefinite, .errorWithActiveSession:
+            return true
+        case .off, .starting, .stopping, .requiresApproval, .error, .stopFailed:
+            return false
+        }
+    }
+
+    /// state 进入/离开"持有会话"时，自动开始/结束合盖监听与压暗。
+    private func reconcileLidDimming(from oldState: ClosedLidKeepAwakeState, to newState: ClosedLidKeepAwakeState) {
+        let was = stateHoldsSession(oldState)
+        let now = stateHoldsSession(newState)
+        if !was, now {
+            beginLidDimmingIfEnabled()
+        } else if was, !now {
+            endLidDimming()
+        }
+    }
+
+    /// 会话激活时开始监听合盖，并对齐当前状态（用户可能在启动前/启动时就已合盖）。
+    /// `LidStateObserver.start()` 自身幂等，重复调用安全。
+    private func beginLidDimmingIfEnabled() {
+        guard settingsStore.dimInternalDisplayOnLidClose else {
+            return
+        }
+        lidObserver.start()
+        if lidObserver.isLidCurrentlyClosed() {
+            dimForLidClosed()
+        }
+    }
+
+    /// 停止监听并兜底恢复亮度（正常情况下开盖已恢复，此处覆盖"合盖中会话结束"等场景）。
+    private func endLidDimming() {
+        lidObserver.stop()
+        restoreBrightnessIfDimmed()
+    }
+
+    private func handleLidStateChanged(closed: Bool) {
+        guard stateHoldsSession(state), settingsStore.dimInternalDisplayOnLidClose else {
+            return
+        }
+        if closed {
+            dimForLidClosed()
+        } else {
+            restoreBrightnessIfDimmed()
+        }
+    }
+
+    private func dimForLidClosed() {
+        guard savedBrightness == nil else {
+            return // 已处于压暗状态，避免覆盖保存值
+        }
+        guard let current = brightnessController.currentInternalBrightness() else {
+            logStore.append("closed-lid dim skipped: could not read built-in brightness")
+            return
+        }
+        savedBrightness = current
+        if brightnessController.setInternalBrightness(0) {
+            logStore.append("closed-lid dimmed built-in display (was \(String(format: "%.2f", current)))")
+        } else {
+            logStore.append("closed-lid dim failed to set brightness")
+        }
+    }
+
+    private func restoreBrightnessIfDimmed() {
+        guard let saved = savedBrightness else {
+            return
+        }
+        savedBrightness = nil
+        if brightnessController.setInternalBrightness(saved) {
+            logStore.append("closed-lid restored built-in brightness to \(String(format: "%.2f", saved))")
+        } else {
+            logStore.append("closed-lid failed to restore brightness to \(String(format: "%.2f", saved))")
+        }
     }
 }
 
