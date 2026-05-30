@@ -19,6 +19,10 @@ enum KeyCodes {
     static let downArrow: UInt16 = 125
     static let upArrow: UInt16 = 126
 
+    static let a: UInt16 = 0
+    static let s: UInt16 = 1
+    static let d: UInt16 = 2
+
     static let leftCommand: UInt16 = 55
     static let rightCommand: UInt16 = 54
     static let leftShift: UInt16 = 56
@@ -62,6 +66,9 @@ enum KeyCodes {
         case rightArrow: "rightArrow"
         case downArrow: "downArrow"
         case upArrow: "upArrow"
+        case a: "A"
+        case s: "S"
+        case d: "D"
         case leftOption: "leftOption"
         case rightOption: "rightOption"
         case leftShift: "leftShift"

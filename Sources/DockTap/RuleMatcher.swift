@@ -23,6 +23,12 @@ struct RuleMatcher {
         KeyCodes.space: .center
     ]
 
+    private let keepAwakeShortcutsByKeyCode: [UInt16: KeepAwakeShortcut] = [
+        KeyCodes.a: .oneHour,
+        KeyCodes.s: .indefinite,
+        KeyCodes.d: .stop
+    ]
+
     func matchKeyDown(
         keyCode: UInt16,
         modifiers: ModifierSnapshot,
@@ -50,6 +56,13 @@ struct RuleMatcher {
 
         if windowActionsEnabled, let action = windowActionsByKeyCode[keyCode] {
             return .windowAction(
+                action,
+                shortcutLabel: triggerModifier.shortcutLabel(forKeyLabel: action.shortcutKeyLabel)
+            )
+        }
+
+        if let action = keepAwakeShortcutsByKeyCode[keyCode] {
+            return .keepAwake(
                 action,
                 shortcutLabel: triggerModifier.shortcutLabel(forKeyLabel: action.shortcutKeyLabel)
             )

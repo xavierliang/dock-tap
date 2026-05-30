@@ -4,6 +4,7 @@ enum ShortcutIntent: Equatable {
     case dockSlot(DockSlotTarget, shortcutLabel: String)
     case finder(shortcutLabel: String)
     case windowAction(WindowAction, shortcutLabel: String)
+    case keepAwake(KeepAwakeShortcut, shortcutLabel: String)
 
     var label: String {
         switch self {
@@ -13,6 +14,25 @@ enum ShortcutIntent: Equatable {
             shortcutLabel
         case .windowAction(_, let shortcutLabel):
             shortcutLabel
+        case .keepAwake(_, let shortcutLabel):
+            shortcutLabel
+        }
+    }
+}
+
+enum KeepAwakeShortcut: Equatable {
+    case oneHour
+    case indefinite
+    case stop
+
+    var shortcutKeyLabel: String {
+        switch self {
+        case .oneHour:
+            "A"
+        case .indefinite:
+            "S"
+        case .stop:
+            "D"
         }
     }
 }

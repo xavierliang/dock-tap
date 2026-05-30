@@ -188,86 +188,108 @@ final class MenuContentModelTests: XCTestCase {
         )
     }
 
-    func testClosedLidMenuOffStateEnablesStartCommandsOnly() {
-        let model = model(closedLidState: .off)
+    private typealias ClosedLidAction = MenuContentModel.ClosedLidMenu.Action
 
-        XCTAssertEqual(model.closedLidMenu.title, "Closed-Lid Keep Awake")
-        XCTAssertEqual(model.closedLidMenu.statusTitle, "Off")
-        XCTAssertEqual(model.closedLidMenu.enableOneHourTitle, "Enable for 1 Hour")
-        XCTAssertTrue(model.closedLidMenu.enableOneHourIsEnabled)
-        XCTAssertFalse(model.closedLidMenu.enableOneHourIsChecked)
-        XCTAssertEqual(model.closedLidMenu.enableIndefinitelyTitle, "Enable Indefinitely")
-        XCTAssertTrue(model.closedLidMenu.enableIndefinitelyIsEnabled)
-        XCTAssertFalse(model.closedLidMenu.enableIndefinitelyIsChecked)
-        XCTAssertEqual(model.closedLidMenu.stopNowTitle, "Stop Now")
-        XCTAssertFalse(model.closedLidMenu.stopNowIsEnabled)
-        XCTAssertNil(model.closedLidMenu.openApprovalSettingsTitle)
+    func testClosedLidMenuOffStateShowsEnableCommandsWithShortcutHints() {
+        let items = model(closedLidState: .off).closedLidMenu.items
+        let expectedActions: [ClosedLidAction?] = [nil, .enableOneHour, .enableIndefinitely]
+
+        XCTAssertEqual(items.map(\.title), [
+            "Closed-Lid Keep Awake",
+            "Left Option+A  Enable for 1 Hour",
+            "Left Option+S  Enable Indefinitely"
+        ])
+        XCTAssertEqual(items.map(\.action), expectedActions)
     }
 
-    func testClosedLidMenuActiveTimedDisablesModeSwitchingAndChecksTimedCommand() {
+    func testClosedLidMenuActiveTimedShowsStatusAndStopOnly() {
         let endDate = Date(timeIntervalSinceReferenceDate: 8_000)
-        let model = model(closedLidState: .activeTimed(endDate: endDate))
+        let items = model(closedLidState: .activeTimed(endDate: endDate)).closedLidMenu.items
         let expectedStatus = AppText.ClosedLid.onUntil(
             time: DateFormatter.localizedString(from: endDate, dateStyle: .none, timeStyle: .short)
         )
+        let expectedActions: [ClosedLidAction?] = [nil, nil, .stop]
 
-        XCTAssertEqual(model.closedLidMenu.statusTitle, expectedStatus)
-        XCTAssertFalse(model.closedLidMenu.enableOneHourIsEnabled)
-        XCTAssertTrue(model.closedLidMenu.enableOneHourIsChecked)
-        XCTAssertFalse(model.closedLidMenu.enableIndefinitelyIsEnabled)
-        XCTAssertFalse(model.closedLidMenu.enableIndefinitelyIsChecked)
-        XCTAssertTrue(model.closedLidMenu.stopNowIsEnabled)
+        XCTAssertEqual(items.map(\.title), [
+            "Closed-Lid Keep Awake",
+            expectedStatus,
+            "Left Option+D  Stop Now"
+        ])
+        XCTAssertEqual(items.map(\.action), expectedActions)
     }
 
-    func testClosedLidMenuActiveIndefiniteDisablesModeSwitchingAndChecksIndefiniteCommand() {
-        let model = model(closedLidState: .activeIndefinite)
+    func testClosedLidMenuActiveIndefiniteShowsStatusAndStopOnly() {
+        let items = model(closedLidState: .activeIndefinite).closedLidMenu.items
+        let expectedActions: [ClosedLidAction?] = [nil, nil, .stop]
 
-        XCTAssertEqual(model.closedLidMenu.statusTitle, "On indefinitely")
-        XCTAssertFalse(model.closedLidMenu.enableOneHourIsEnabled)
-        XCTAssertFalse(model.closedLidMenu.enableOneHourIsChecked)
-        XCTAssertFalse(model.closedLidMenu.enableIndefinitelyIsEnabled)
-        XCTAssertTrue(model.closedLidMenu.enableIndefinitelyIsChecked)
-        XCTAssertTrue(model.closedLidMenu.stopNowIsEnabled)
+        XCTAssertEqual(items.map(\.title), [
+            "Closed-Lid Keep Awake",
+            "On indefinitely",
+            "Left Option+D  Stop Now"
+        ])
+        XCTAssertEqual(items.map(\.action), expectedActions)
     }
 
-    func testClosedLidMenuBusyAndApprovalStatesDisableStartCommands() {
-        let starting = model(closedLidState: .starting).closedLidMenu
-        let stopping = model(closedLidState: .stopping).closedLidMenu
-        let approval = model(closedLidState: .requiresApproval).closedLidMenu
+    func testClosedLidMenuShortcutHintsFollowSelectedPreset() {
+        let items = MenuContentModel(
+            dockRows: [],
+            selectedPreset: .rightCommand,
+            isAccessibilityTrusted: true,
+            isEventTapReady: true,
+            windowActionsEnabled: false,
+            closedLidState: .off,
+            appName: "Dock Tap",
+            appVersion: "0.0.0"
+        ).closedLidMenu.items
 
-        XCTAssertEqual(starting.statusTitle, "Starting…")
-        XCTAssertFalse(starting.enableOneHourIsEnabled)
-        XCTAssertFalse(starting.stopNowIsEnabled)
+        XCTAssertEqual(items.map(\.title), [
+            "Closed-Lid Keep Awake",
+            "Right Command+A  Enable for 1 Hour",
+            "Right Command+S  Enable Indefinitely"
+        ])
+    }
+
+    func testClosedLidMenuBusyStatesShowStatusLineOnly() {
+        let starting = model(closedLidState: .starting).closedLidMenu.items
+        let stopping = model(closedLidState: .stopping).closedLidMenu.items
+        let expectedActions: [ClosedLidAction?] = [nil, nil]
+
+        XCTAssertEqual(starting.map(\.title), ["Closed-Lid Keep Awake", "Starting…"])
+        XCTAssertEqual(starting.map(\.action), expectedActions)
+        XCTAssertEqual(stopping.map(\.title), ["Closed-Lid Keep Awake", "Stopping…"])
+        XCTAssertEqual(stopping.map(\.action), expectedActions)
         XCTAssertTrue(ClosedLidKeepAwakeState.starting.canStopSession)
-
-        XCTAssertEqual(stopping.statusTitle, "Stopping…")
-        XCTAssertFalse(stopping.enableIndefinitelyIsEnabled)
-        XCTAssertFalse(stopping.stopNowIsEnabled)
-
-        XCTAssertEqual(approval.statusTitle, "Helper approval required")
-        XCTAssertFalse(approval.enableOneHourIsEnabled)
-        XCTAssertFalse(approval.stopNowIsEnabled)
-        XCTAssertEqual(approval.openApprovalSettingsTitle, "Open Login Items Settings...")
     }
 
-    func testClosedLidMenuErrorAllowsRetryButStopFailureKeepsRecoveryAvailable() {
-        let error = model(closedLidState: .error("helper unavailable")).closedLidMenu
-        let activeError = model(closedLidState: .errorWithActiveSession("restore failed")).closedLidMenu
-        let stopFailed = model(closedLidState: .stopFailed("restore failed")).closedLidMenu
+    func testClosedLidMenuRequiresApprovalShowsApprovalLink() {
+        let items = model(closedLidState: .requiresApproval).closedLidMenu.items
+        let expectedActions: [ClosedLidAction?] = [nil, nil, .openApprovalSettings]
 
-        XCTAssertEqual(error.statusTitle, "Error: helper unavailable")
-        XCTAssertTrue(error.enableOneHourIsEnabled)
-        XCTAssertFalse(error.stopNowIsEnabled)
+        XCTAssertEqual(items.map(\.title), [
+            "Closed-Lid Keep Awake",
+            "Helper approval required",
+            "Open Login Items Settings..."
+        ])
+        XCTAssertEqual(items.map(\.action), expectedActions)
+    }
 
-        XCTAssertTrue(activeError.statusTitle.contains("Error: restore failed."))
-        XCTAssertTrue(activeError.statusTitle.contains("sudo pmset -a disablesleep 0"))
-        XCTAssertFalse(activeError.enableOneHourIsEnabled)
-        XCTAssertTrue(activeError.stopNowIsEnabled)
+    func testClosedLidMenuErrorAllowsRetryWhileStopFailureKeepsStop() {
+        let error = model(closedLidState: .error("helper unavailable")).closedLidMenu.items
+        let activeError = model(closedLidState: .errorWithActiveSession("restore failed")).closedLidMenu.items
+        let stopFailed = model(closedLidState: .stopFailed("restore failed")).closedLidMenu.items
+        let errorActions: [ClosedLidAction?] = [nil, nil, .enableOneHour, .enableIndefinitely]
+        let stopActions: [ClosedLidAction?] = [nil, nil, .stop]
 
-        XCTAssertTrue(stopFailed.statusTitle.contains("Error: restore failed."))
-        XCTAssertTrue(stopFailed.statusTitle.contains("sudo pmset -a disablesleep 0"))
-        XCTAssertFalse(stopFailed.enableOneHourIsEnabled)
-        XCTAssertTrue(stopFailed.stopNowIsEnabled)
+        XCTAssertEqual(error.map(\.action), errorActions)
+        XCTAssertEqual(error[1].title, "Error: helper unavailable")
+
+        XCTAssertEqual(activeError.map(\.action), stopActions)
+        XCTAssertTrue(activeError[1].title.contains("Error: restore failed."))
+        XCTAssertTrue(activeError[1].title.contains("sudo pmset -a disablesleep 0"))
+
+        XCTAssertEqual(stopFailed.map(\.action), stopActions)
+        XCTAssertTrue(stopFailed[1].title.contains("Error: restore failed."))
+        XCTAssertTrue(stopFailed[1].title.contains("sudo pmset -a disablesleep 0"))
     }
 
     func testVersionTitleShowsVersion() {

@@ -38,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }()
 
     private var statusItem: NSStatusItem?
+    private var statusDotView: StatusDotView?
     private let statusMenu = NSMenu()
     private var logWindowController: LogWindowController?
     private var eventTapController: EventTapController?
@@ -209,17 +210,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
 
-        guard let image = Bundle.main.image(forResource: "StatusBarIconTemplate") else {
+        if let image = Bundle.main.image(forResource: "StatusBarIconTemplate") {
+            image.isTemplate = true
+            button.image = image
+            button.imagePosition = .imageOnly
+            button.title = ""
+        } else {
             button.image = nil
             button.imagePosition = .noImage
             button.title = "DT"
+        }
+
+        installStatusDot(on: button)
+    }
+
+    private func installStatusDot(on button: NSStatusBarButton) {
+        guard statusDotView == nil else {
             return
         }
 
-        image.isTemplate = true
-        button.image = image
-        button.imagePosition = .imageOnly
-        button.title = ""
+        let dot = StatusDotView()
+        dot.translatesAutoresizingMaskIntoConstraints = false
+        button.addSubview(dot)
+        NSLayoutConstraint.activate([
+            dot.widthAnchor.constraint(equalToConstant: 6),
+            dot.heightAnchor.constraint(equalToConstant: 6),
+            dot.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -1),
+            dot.topAnchor.constraint(equalTo: button.topAnchor, constant: 2)
+        ])
+        statusDotView = dot
+    }
+
+    private func updateStatusDot() {
+        switch closedLidController.state {
+        case .activeIndefinite:
+            statusDotView?.color = .systemGreen
+        case .activeTimed:
+            statusDotView?.color = .systemOrange
+        default:
+            statusDotView?.color = nil
+        }
     }
 
     private func checkPermission(prompt: Bool) {
@@ -305,6 +335,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             windowActor.perform(intent)
         case .dockSlot, .finder:
             appActivator.perform(intent)
+        case .keepAwake(let action, shortcutLabel: _):
+            switch action {
+            case .oneHour:
+                closedLidController.enableForOneHour()
+            case .indefinite:
+                closedLidController.enableIndefinitely()
+            case .stop:
+                closedLidController.stopNow()
+            }
         }
     }
 
@@ -328,6 +367,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusMenu.addItem(disabledItem(menuModel.summaryTitle))
         statusMenu.addItem(.separator())
 
+        for item in closedLidMenuItems(menuModel) {
+            statusMenu.addItem(item)
+        }
+        statusMenu.addItem(.separator())
+
         statusMenu.addItem(mappingMenuItem(menuModel))
         statusMenu.addItem(triggerModifierMenuItem(menuModel))
         statusMenu.addItem(.separator())
@@ -340,7 +384,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         windowSnapItem.state = menuModel.windowSnapToggleIsOn ? .on : .off
         statusMenu.addItem(windowSnapItem)
         statusMenu.addItem(windowSnapMenuItem(menuModel))
-        statusMenu.addItem(closedLidMenuItem(menuModel))
         statusMenu.addItem(.separator())
 
         let loginItem = commandItem(title: loginMenuModel.title, action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
@@ -366,6 +409,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusMenu.addItem(disabledItem(menuModel.versionTitle))
         statusMenu.addItem(.separator())
         statusMenu.addItem(commandItem(title: menuModel.quitTitle, action: #selector(quit), keyEquivalent: ""))
+
+        updateStatusDot()
     }
 
     private func mappingMenuItem(_ menuModel: MenuContentModel) -> NSMenuItem {
@@ -390,51 +435,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return item
     }
 
-    private func closedLidMenuItem(_ menuModel: MenuContentModel) -> NSMenuItem {
-        let model = menuModel.closedLidMenu
-        let item = NSMenuItem(title: model.title, action: nil, keyEquivalent: "")
-        let submenu = NSMenu(title: model.title)
-
-        submenu.addItem(disabledItem(model.statusTitle))
-        submenu.addItem(.separator())
-
-        let oneHourItem = commandItem(
-            title: model.enableOneHourTitle,
-            action: #selector(enableClosedLidForOneHour),
-            keyEquivalent: ""
-        )
-        oneHourItem.isEnabled = model.enableOneHourIsEnabled
-        oneHourItem.state = model.enableOneHourIsChecked ? .on : .off
-        submenu.addItem(oneHourItem)
-
-        let indefiniteItem = commandItem(
-            title: model.enableIndefinitelyTitle,
-            action: #selector(enableClosedLidIndefinitely),
-            keyEquivalent: ""
-        )
-        indefiniteItem.isEnabled = model.enableIndefinitelyIsEnabled
-        indefiniteItem.state = model.enableIndefinitelyIsChecked ? .on : .off
-        submenu.addItem(indefiniteItem)
-
-        let stopItem = commandItem(
-            title: model.stopNowTitle,
-            action: #selector(stopClosedLidNow),
-            keyEquivalent: ""
-        )
-        stopItem.isEnabled = model.stopNowIsEnabled
-        submenu.addItem(stopItem)
-
-        if let title = model.openApprovalSettingsTitle {
-            submenu.addItem(.separator())
-            submenu.addItem(commandItem(
-                title: title,
-                action: #selector(openClosedLidApprovalSettings),
+    private func closedLidMenuItems(_ menuModel: MenuContentModel) -> [NSMenuItem] {
+        menuModel.closedLidMenu.items.map { item in
+            guard let action = item.action else {
+                return disabledItem(item.title)
+            }
+            return commandItem(
+                title: item.title,
+                action: closedLidSelector(for: action),
                 keyEquivalent: ""
-            ))
+            )
         }
+    }
 
-        item.submenu = submenu
-        return item
+    private func closedLidSelector(for action: MenuContentModel.ClosedLidMenu.Action) -> Selector {
+        switch action {
+        case .enableOneHour:
+            return #selector(enableClosedLidForOneHour)
+        case .enableIndefinitely:
+            return #selector(enableClosedLidIndefinitely)
+        case .stop:
+            return #selector(stopClosedLidNow)
+        case .openApprovalSettings:
+            return #selector(openClosedLidApprovalSettings)
+        }
     }
 
     private func triggerModifierMenuItem(_ menuModel: MenuContentModel) -> NSMenuItem {

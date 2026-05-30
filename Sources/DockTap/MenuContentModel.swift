@@ -2,17 +2,20 @@ import Foundation
 
 struct MenuContentModel: Equatable {
     struct ClosedLidMenu: Equatable {
-        let title: String
-        let statusTitle: String
-        let enableOneHourTitle: String
-        let enableOneHourIsEnabled: Bool
-        let enableOneHourIsChecked: Bool
-        let enableIndefinitelyTitle: String
-        let enableIndefinitelyIsEnabled: Bool
-        let enableIndefinitelyIsChecked: Bool
-        let stopNowTitle: String
-        let stopNowIsEnabled: Bool
-        let openApprovalSettingsTitle: String?
+        enum Action: Equatable {
+            case enableOneHour
+            case enableIndefinitely
+            case stop
+            case openApprovalSettings
+        }
+
+        struct Item: Equatable {
+            let title: String
+            // nil marks a non-clickable status / header line (rendered disabled).
+            let action: Action?
+        }
+
+        let items: [Item]
     }
 
     struct MappingRow: Equatable {
@@ -98,7 +101,7 @@ struct MenuContentModel: Equatable {
         windowSnapToggleIsOn = windowActionsEnabled
         windowSnapSubmenuTitle = AppText.WindowSnap.submenuTitle
         windowSnapRows = Self.windowSnapRows(selectedPreset: selectedPreset)
-        closedLidMenu = Self.closedLidMenu(state: closedLidState)
+        closedLidMenu = Self.closedLidMenu(state: closedLidState, selectedPreset: selectedPreset)
         updateDockShortcutsTitle = AppText.Menu.updateDockShortcuts
         showLogsTitle = AppText.Menu.showLogs
         checkAccessibilityTitle = isAccessibilityTrusted ? nil : AppText.Menu.checkAccessibility
@@ -153,21 +156,50 @@ struct MenuContentModel: Equatable {
         }
     }
 
-    private static func closedLidMenu(state: ClosedLidKeepAwakeState) -> ClosedLidMenu {
-        let enableCommandsAreEnabled = state.canStartSession
-        return ClosedLidMenu(
-            title: AppText.ClosedLid.submenuTitle,
-            statusTitle: AppText.ClosedLid.statusTitle(for: state),
-            enableOneHourTitle: AppText.ClosedLid.enableOneHour,
-            enableOneHourIsEnabled: enableCommandsAreEnabled,
-            enableOneHourIsChecked: state.isTimed,
-            enableIndefinitelyTitle: AppText.ClosedLid.enableIndefinitely,
-            enableIndefinitelyIsEnabled: enableCommandsAreEnabled,
-            enableIndefinitelyIsChecked: state.isIndefinite,
-            stopNowTitle: AppText.ClosedLid.stopNow,
-            stopNowIsEnabled: state.canStopFromMenu,
-            openApprovalSettingsTitle: state == .requiresApproval ? AppText.ClosedLid.openLoginItemsSettings : nil
-        )
+    private static func closedLidMenu(
+        state: ClosedLidKeepAwakeState,
+        selectedPreset: TriggerModifierPreset
+    ) -> ClosedLidMenu {
+        func shortcutItem(
+            _ shortcut: KeepAwakeShortcut,
+            title: String,
+            action: ClosedLidMenu.Action
+        ) -> ClosedLidMenu.Item {
+            ClosedLidMenu.Item(
+                title: "\(selectedPreset.shortcutLabel(forKeyLabel: shortcut.shortcutKeyLabel))  \(title)",
+                action: action
+            )
+        }
+
+        let header = ClosedLidMenu.Item(title: AppText.ClosedLid.submenuTitle, action: nil)
+        let statusLine = ClosedLidMenu.Item(title: AppText.ClosedLid.statusTitle(for: state), action: nil)
+        let enableOneHour = shortcutItem(.oneHour, title: AppText.ClosedLid.enableOneHour, action: .enableOneHour)
+        let enableIndefinitely = shortcutItem(
+            .indefinite, title: AppText.ClosedLid.enableIndefinitely, action: .enableIndefinitely)
+        let stop = shortcutItem(.stop, title: AppText.ClosedLid.stopNow, action: .stop)
+
+        var items: [ClosedLidMenu.Item] = [header]
+        switch state {
+        case .off:
+            items.append(enableOneHour)
+            items.append(enableIndefinitely)
+        case .error:
+            items.append(statusLine)
+            items.append(enableOneHour)
+            items.append(enableIndefinitely)
+        case .activeTimed, .activeIndefinite, .errorWithActiveSession, .stopFailed:
+            items.append(statusLine)
+            items.append(stop)
+        case .requiresApproval:
+            items.append(statusLine)
+            items.append(ClosedLidMenu.Item(
+                title: AppText.ClosedLid.openLoginItemsSettings,
+                action: .openApprovalSettings
+            ))
+        case .starting, .stopping:
+            items.append(statusLine)
+        }
+        return ClosedLidMenu(items: items)
     }
 }
 

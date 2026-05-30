@@ -54,6 +54,8 @@ final class AppActivator {
             return .finderUnavailable(shortcutLabel: shortcutLabel)
         case .windowAction(_, shortcutLabel: let shortcutLabel):
             return .ignoredNonActivationIntent(shortcutLabel: shortcutLabel)
+        case .keepAwake(_, shortcutLabel: let shortcutLabel):
+            return .ignoredNonActivationIntent(shortcutLabel: shortcutLabel)
         }
     }
 
