@@ -14,7 +14,7 @@
 "menu.dockShortcutBindings" = "Dock Shortcut Bindings";
 "menu.triggerModifier" = "Shortcut Modifier";
 "menu.triggerModifierFormat" = "Shortcut Modifier: %@";
-"menu.updateDockShortcuts" = "Update Dock Shortcuts";
+"menu.updateDockShortcuts" = "Refresh Dock Shortcuts";
 "menu.showLogs" = "Show Logs";
 "menu.checkAccessibility" = "Check Accessibility";
 "menu.openAccessibilitySettings" = "Open Accessibility Settings";

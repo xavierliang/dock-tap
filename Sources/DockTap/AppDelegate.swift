@@ -376,10 +376,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             availableUpdateVersion: updateController.availableUpdateVersion
         )
 
-        statusMenu.addItem(triggerModifierMenuItem(menuModel))
-        statusMenu.addItem(.separator())
-
         statusMenu.addItem(disabledItem(menuModel.summaryTitle))
+        statusMenu.addItem(triggerModifierMenuItem(menuModel))
         statusMenu.addItem(.separator())
 
         for item in closedLidMenuItems(menuModel) {

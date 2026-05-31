@@ -39,7 +39,7 @@ enum AppText {
         static let triggerModifier = NSLocalizedString(
             "menu.triggerModifier", value: "Shortcut Modifier", comment: "Menu: shortcut modifier label")
         static let updateDockShortcuts = NSLocalizedString(
-            "menu.updateDockShortcuts", value: "Update Dock Shortcuts", comment: "Menu command")
+            "menu.updateDockShortcuts", value: "Refresh Dock Shortcuts", comment: "Menu command")
         static let showLogs = NSLocalizedString(
             "menu.showLogs", value: "Show Logs", comment: "Menu command")
         static let checkAccessibility = NSLocalizedString(

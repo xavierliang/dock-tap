@@ -14,7 +14,7 @@
 "menu.dockShortcutBindings" = "Dock 快捷键绑定";
 "menu.triggerModifier" = "快捷键修饰键";
 "menu.triggerModifierFormat" = "快捷键修饰键：%@";
-"menu.updateDockShortcuts" = "更新 Dock 快捷方式";
+"menu.updateDockShortcuts" = "刷新 Dock 快捷方式";
 "menu.showLogs" = "显示日志";
 "menu.checkAccessibility" = "检查辅助功能";
 "menu.openAccessibilitySettings" = "打开辅助功能设置";

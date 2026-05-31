@@ -85,7 +85,7 @@ final class MenuContentModelTests: XCTestCase {
             appVersion: "0.0.0"
         )
 
-        XCTAssertEqual(model.updateDockShortcutsTitle, "Update Dock Shortcuts")
+        XCTAssertEqual(model.updateDockShortcutsTitle, "Refresh Dock Shortcuts")
     }
 
     func testSummaryUsesAssignedShortcutCountCappedAtTenWithoutDiagnosticDetail() {
