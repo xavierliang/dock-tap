@@ -147,6 +147,24 @@ final class RuleMatcherPresetTests: XCTestCase {
         }
     }
 
+    func testDockShortcutKeysPassThroughWhenDockShortcutsAreDisabled() {
+        let one = decide(
+            keyCode: KeyCodes.one,
+            slots: snapshot(appCount: 1),
+            dockShortcutsEnabled: false
+        )
+        let backtick = decide(
+            keyCode: KeyCodes.backtick,
+            slots: snapshot(appCount: 1),
+            dockShortcutsEnabled: false
+        )
+
+        XCTAssertFalse(one.consumesEvent)
+        XCTAssertNil(one.intent)
+        XCTAssertFalse(backtick.consumesEvent)
+        XCTAssertNil(backtick.intent)
+    }
+
     func testRejectsWhenSelectedPresetKeyIsNotDown() {
         let decision = decider.decide(
             kind: .keyDown,
@@ -205,7 +223,8 @@ final class RuleMatcherPresetTests: XCTestCase {
         keyCode: UInt16,
         preset: TriggerModifierPreset = .leftOption,
         modifiers: ModifierSnapshot? = nil,
-        slots: DockSlotSnapshot
+        slots: DockSlotSnapshot,
+        dockShortcutsEnabled: Bool = true
     ) -> KeyEventDecision {
         decider.decide(
             kind: .keyDown,
@@ -213,6 +232,7 @@ final class RuleMatcherPresetTests: XCTestCase {
             modifiers: modifiers ?? self.modifiers(with: [preset.physicalKeyCode]),
             triggerModifier: preset,
             slots: slots,
+            dockShortcutsEnabled: dockShortcutsEnabled,
             windowActionsEnabled: false
         )
     }

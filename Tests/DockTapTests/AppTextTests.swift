@@ -9,9 +9,10 @@ final class AppTextTests: XCTestCase {
     }
 
     func testMenuCommandNamesMatchM3Copy() {
-        XCTAssertEqual(AppText.Menu.dockShortcuts, "Dock Shortcuts")
+        XCTAssertEqual(AppText.Menu.enableDockShortcuts, "Enable Dock Shortcuts")
+        XCTAssertEqual(AppText.Menu.dockShortcutBindings, "Dock Shortcut Bindings")
         XCTAssertEqual(AppText.Menu.updateDockShortcuts, "Update Dock Shortcuts")
-        XCTAssertEqual(AppText.Menu.triggerModifierTitle("Left Option"), "Trigger Modifier: Left Option")
+        XCTAssertEqual(AppText.Menu.triggerModifierTitle("Left Option"), "Shortcut Modifier: Left Option")
     }
 
     func testVersionTitleUsesCompactCopy() {

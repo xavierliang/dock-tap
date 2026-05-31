@@ -3,6 +3,7 @@ import Foundation
 final class SettingsStore {
     private enum Keys {
         static let triggerModifierPreset = "triggerModifierPreset"
+        static let dockShortcutsEnabled = "dockShortcutsEnabled"
         static let windowActionsEnabled = "windowActionsEnabled"
         static let hasSeenClosedLidWarning = "hasSeenClosedLidWarning"
     }
@@ -31,6 +32,18 @@ final class SettingsStore {
         }
         set {
             defaults.set(newValue, forKey: Keys.windowActionsEnabled)
+        }
+    }
+
+    var dockShortcutsEnabled: Bool {
+        get {
+            guard defaults.object(forKey: Keys.dockShortcutsEnabled) != nil else {
+                return true
+            }
+            return defaults.bool(forKey: Keys.dockShortcutsEnabled)
+        }
+        set {
+            defaults.set(newValue, forKey: Keys.dockShortcutsEnabled)
         }
     }
 

@@ -45,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var healthReconcileTimer: Timer?
     private var isAccessibilityTrusted = false
     private var selectedTriggerModifierPreset = TriggerModifierPreset.defaultPreset
+    private var dockShortcutsEnabled = true
     private var windowActionsEnabled = false
     private var lastLoginItemFailure: String?
     private var isTerminationGatePending = false
@@ -52,6 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         selectedTriggerModifierPreset = settingsStore.selectedTriggerModifierPreset
+        dockShortcutsEnabled = settingsStore.dockShortcutsEnabled
         windowActionsEnabled = settingsStore.windowActionsEnabled
         buildStatusItem()
 
@@ -66,9 +68,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.reconcilePermissionAndTapHealth(prompt: false, reason: "tap recovery")
         }
         eventTapController?.updateTriggerModifierPreset(selectedTriggerModifierPreset)
+        eventTapController?.updateDockShortcutsEnabled(dockShortcutsEnabled)
         eventTapController?.updateWindowActionsEnabled(windowActionsEnabled)
 
-        logStore.append("launch bundle=\(bundleIdentifier) path=\(Bundle.main.bundlePath) trigger=\(selectedTriggerModifierPreset.rawValue)")
+        logStore.append("launch bundle=\(bundleIdentifier) path=\(Bundle.main.bundlePath) trigger=\(selectedTriggerModifierPreset.rawValue) dockShortcutsEnabled=\(dockShortcutsEnabled)")
         activeAppProvider.start { [weak self] state in
             self?.workspaceStateDidChange(state)
         }
@@ -156,6 +159,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settingsStore.selectedTriggerModifierPreset = preset
         eventTapController?.updateTriggerModifierPreset(preset)
         logStore.append("trigger modifier preset=\(preset.rawValue)")
+        rebuildMenu()
+    }
+
+    @objc private func toggleDockShortcutsEnabled() {
+        dockShortcutsEnabled.toggle()
+        settingsStore.dockShortcutsEnabled = dockShortcutsEnabled
+        eventTapController?.updateDockShortcutsEnabled(dockShortcutsEnabled)
+        logStore.append("dock shortcuts enabled=\(dockShortcutsEnabled)")
         rebuildMenu()
     }
 
@@ -357,12 +368,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             selectedPreset: selectedTriggerModifierPreset,
             isAccessibilityTrusted: isAccessibilityTrusted,
             isEventTapReady: eventTapController?.isReady == true,
+            dockShortcutsEnabled: dockShortcutsEnabled,
             windowActionsEnabled: windowActionsEnabled,
             closedLidState: closedLidController.state,
             appName: appName,
             appVersion: appVersion,
             availableUpdateVersion: updateController.availableUpdateVersion
         )
+
+        statusMenu.addItem(triggerModifierMenuItem(menuModel))
+        statusMenu.addItem(.separator())
 
         statusMenu.addItem(disabledItem(menuModel.summaryTitle))
         statusMenu.addItem(.separator())
@@ -372,8 +387,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         statusMenu.addItem(.separator())
 
+        let dockShortcutsItem = commandItem(
+            title: menuModel.dockShortcutsToggleTitle,
+            action: #selector(toggleDockShortcutsEnabled),
+            keyEquivalent: ""
+        )
+        dockShortcutsItem.state = menuModel.dockShortcutsToggleIsOn ? .on : .off
+        statusMenu.addItem(dockShortcutsItem)
         statusMenu.addItem(mappingMenuItem(menuModel))
-        statusMenu.addItem(triggerModifierMenuItem(menuModel))
+        statusMenu.addItem(commandItem(title: menuModel.updateDockShortcutsTitle, action: #selector(refreshDockFromMenu), keyEquivalent: ""))
         statusMenu.addItem(.separator())
 
         let windowSnapItem = commandItem(
@@ -399,7 +421,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             statusMenu.addItem(commandItem(title: title, action: #selector(openAccessibilitySettingsFromMenu), keyEquivalent: ""))
         }
 
-        statusMenu.addItem(commandItem(title: menuModel.updateDockShortcutsTitle, action: #selector(refreshDockFromMenu), keyEquivalent: ""))
         statusMenu.addItem(commandItem(title: menuModel.showLogsTitle, action: #selector(showLogs), keyEquivalent: ""))
         statusMenu.addItem(.separator())
         if let updateAvailableTitle = menuModel.updateAvailableTitle {
@@ -414,8 +435,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func mappingMenuItem(_ menuModel: MenuContentModel) -> NSMenuItem {
-        let item = NSMenuItem(title: menuModel.dockShortcutsTitle, action: nil, keyEquivalent: "")
-        let submenu = NSMenu(title: menuModel.dockShortcutsTitle)
+        let item = NSMenuItem(title: menuModel.dockShortcutBindingsTitle, action: nil, keyEquivalent: "")
+        let submenu = NSMenu(title: menuModel.dockShortcutBindingsTitle)
         submenu.addItem(disabledItem(menuModel.finderShortcutTitle))
         submenu.addItem(.separator())
         for row in menuModel.mappingRows {

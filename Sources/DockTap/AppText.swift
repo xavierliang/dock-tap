@@ -32,10 +32,12 @@ enum AppText {
     }
 
     enum Menu {
-        static let dockShortcuts = NSLocalizedString(
-            "menu.dockShortcuts", value: "Dock Shortcuts", comment: "Menu section header")
+        static let enableDockShortcuts = NSLocalizedString(
+            "menu.enableDockShortcuts", value: "Enable Dock Shortcuts", comment: "Menu toggle")
+        static let dockShortcutBindings = NSLocalizedString(
+            "menu.dockShortcutBindings", value: "Dock Shortcut Bindings", comment: "Submenu title")
         static let triggerModifier = NSLocalizedString(
-            "menu.triggerModifier", value: "Trigger Modifier", comment: "Menu: trigger modifier label")
+            "menu.triggerModifier", value: "Shortcut Modifier", comment: "Menu: shortcut modifier label")
         static let updateDockShortcuts = NSLocalizedString(
             "menu.updateDockShortcuts", value: "Update Dock Shortcuts", comment: "Menu command")
         static let showLogs = NSLocalizedString(
@@ -53,8 +55,8 @@ enum AppText {
         static func triggerModifierTitle(_ presetTitle: String) -> String {
             String(
                 format: NSLocalizedString(
-                    "menu.triggerModifierFormat", value: "Trigger Modifier: %@",
-                    comment: "Menu: trigger modifier with selected preset name (preset kept in English)"),
+                    "menu.triggerModifierFormat", value: "Shortcut Modifier: %@",
+                    comment: "Menu: shortcut modifier with selected preset name (preset kept in English)"),
                 presetTitle)
         }
 

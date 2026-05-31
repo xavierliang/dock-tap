@@ -36,7 +36,9 @@ struct MenuContentModel: Equatable {
     }
 
     let summaryTitle: String
-    let dockShortcutsTitle: String
+    let dockShortcutsToggleTitle: String
+    let dockShortcutsToggleIsOn: Bool
+    let dockShortcutBindingsTitle: String
     let finderShortcutTitle: String
     let mappingRows: [MappingRow]
     let triggerModifierTitle: String
@@ -61,6 +63,7 @@ struct MenuContentModel: Equatable {
         selectedPreset: TriggerModifierPreset,
         isAccessibilityTrusted: Bool,
         isEventTapReady: Bool,
+        dockShortcutsEnabled: Bool = true,
         windowActionsEnabled: Bool,
         closedLidState: ClosedLidKeepAwakeState = .off,
         appName: String,
@@ -76,11 +79,12 @@ struct MenuContentModel: Equatable {
 
         summaryTitle = [
             statusTitle,
-            selectedPreset.menuTitle,
             AppText.DockShortcuts.countTitle(assignedCount)
         ].joined(separator: " · ")
         assignedShortcutCount = assignedCount
-        dockShortcutsTitle = AppText.Menu.dockShortcuts
+        dockShortcutsToggleTitle = AppText.Menu.enableDockShortcuts
+        dockShortcutsToggleIsOn = dockShortcutsEnabled
+        dockShortcutBindingsTitle = AppText.Menu.dockShortcutBindings
         finderShortcutTitle = Self.finderShortcutTitle(selectedPreset: selectedPreset)
         mappingRows = (0..<10).map { shortcutIndex in
             Self.mappingRow(

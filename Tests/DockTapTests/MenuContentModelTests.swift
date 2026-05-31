@@ -2,7 +2,7 @@ import XCTest
 @testable import DockTap
 
 final class MenuContentModelTests: XCTestCase {
-    func testDockShortcutsSubmenuIncludesFinderShortcutTitle() {
+    func testDockShortcutBindingsSubmenuIncludesFinderShortcutTitle() {
         let model = MenuContentModel(
             dockRows: (0..<10).map { row(index: $0, name: "Dock App \($0 + 1)") },
             selectedPreset: .leftOption,
@@ -13,7 +13,9 @@ final class MenuContentModelTests: XCTestCase {
             appVersion: "0.0.0"
         )
 
-        XCTAssertEqual(model.dockShortcutsTitle, "Dock Shortcuts")
+        XCTAssertEqual(model.dockShortcutsToggleTitle, "Enable Dock Shortcuts")
+        XCTAssertTrue(model.dockShortcutsToggleIsOn)
+        XCTAssertEqual(model.dockShortcutBindingsTitle, "Dock Shortcut Bindings")
         XCTAssertEqual(model.finderShortcutTitle, "Left Option+`  Finder")
     }
 
@@ -49,9 +51,27 @@ final class MenuContentModelTests: XCTestCase {
             appVersion: "0.0.0"
         )
 
-        XCTAssertEqual(model.triggerModifierTitle, "Trigger Modifier: Right Option")
+        XCTAssertEqual(model.triggerModifierTitle, "Shortcut Modifier: Right Option")
         XCTAssertEqual(model.triggerRows.map(\.title), TriggerModifierPreset.allCases.map(\.menuTitle))
         XCTAssertEqual(model.triggerRows.filter(\.isSelected).map(\.preset), [.rightOption])
+    }
+
+    func testDockShortcutsToggleCanBeOffWithoutHidingBindings() {
+        let model = MenuContentModel(
+            dockRows: [],
+            selectedPreset: .leftOption,
+            isAccessibilityTrusted: true,
+            isEventTapReady: true,
+            dockShortcutsEnabled: false,
+            windowActionsEnabled: false,
+            appName: "Dock Tap",
+            appVersion: "0.0.0"
+        )
+
+        XCTAssertEqual(model.dockShortcutsToggleTitle, "Enable Dock Shortcuts")
+        XCTAssertFalse(model.dockShortcutsToggleIsOn)
+        XCTAssertEqual(model.dockShortcutBindingsTitle, "Dock Shortcut Bindings")
+        XCTAssertEqual(model.mappingRows.count, 10)
     }
 
     func testManualUpdateLabelUsesProductCopy() {
@@ -80,9 +100,10 @@ final class MenuContentModelTests: XCTestCase {
         )
 
         XCTAssertEqual(model.assignedShortcutCount, 10)
-        XCTAssertEqual(model.summaryTitle, "Ready · Left Control · 10 Dock shortcuts")
+        XCTAssertEqual(model.summaryTitle, "Ready · 10 Dock shortcuts")
         XCTAssertFalse(model.summaryTitle.contains("skipped"))
         XCTAssertFalse(model.summaryTitle.contains("more"))
+        XCTAssertFalse(model.summaryTitle.contains("Left Control"))
     }
 
     func testSummaryShowsMissingAccessibilityPermissionAndActionsOnlyWhenNeeded() {
@@ -105,7 +126,7 @@ final class MenuContentModelTests: XCTestCase {
             appVersion: "0.0.0"
         )
 
-        XCTAssertEqual(missing.summaryTitle, "Missing Accessibility Permission · Left Option · 0 Dock shortcuts")
+        XCTAssertEqual(missing.summaryTitle, "Missing Accessibility Permission · 0 Dock shortcuts")
         XCTAssertEqual(missing.checkAccessibilityTitle, "Check Accessibility")
         XCTAssertEqual(missing.openAccessibilitySettingsTitle, "Open Accessibility Settings")
         XCTAssertNil(trusted.checkAccessibilityTitle)
@@ -141,9 +162,9 @@ final class MenuContentModelTests: XCTestCase {
             appVersion: "0.0.0"
         )
 
-        XCTAssertEqual(missing.summaryTitle, "Missing Accessibility Permission · Left Option · 0 Dock shortcuts")
-        XCTAssertEqual(starting.summaryTitle, "Starting · Left Command · 0 Dock shortcuts")
-        XCTAssertEqual(ready.summaryTitle, "Ready · Right Option · 0 Dock shortcuts")
+        XCTAssertEqual(missing.summaryTitle, "Missing Accessibility Permission · 0 Dock shortcuts")
+        XCTAssertEqual(starting.summaryTitle, "Starting · 0 Dock shortcuts")
+        XCTAssertEqual(ready.summaryTitle, "Ready · 0 Dock shortcuts")
     }
 
     func testSummaryShowsStartingWhenAccessibilityIsTrustedButTapIsNotReady() {
@@ -157,7 +178,7 @@ final class MenuContentModelTests: XCTestCase {
             appVersion: "0.0.0"
         )
 
-        XCTAssertEqual(model.summaryTitle, "Starting · Left Command · 0 Dock shortcuts")
+        XCTAssertEqual(model.summaryTitle, "Starting · 0 Dock shortcuts")
     }
 
     func testWindowSnapToggleAndRowsUseSelectedPreset() {

@@ -10,9 +10,9 @@ On first launch, grant Dock Tap Accessibility access in System Settings. Dock Ta
 
 ## Usage
 
-Launch Dock Tap from `/Applications`. Choose a trigger preset from the menu bar item, then hold that physical modifier and press `1` through `0` to activate the matching Dock app. Press the same modifier plus backtick to activate Finder.
+Launch Dock Tap from `/Applications`. Choose `Shortcut Modifier` from the menu bar item, then hold that physical modifier and press `1` through `0` to activate the matching Dock app. Press the same modifier plus backtick to activate Finder.
 
-Use the menu to refresh Dock shortcuts, enable or disable Window Snap, control Closed-Lid Keep Awake, and configure Launch at Login.
+Use the menu to enable or disable Dock Shortcuts and Window Snap, refresh Dock shortcuts, control Closed-Lid Keep Awake, and configure Launch at Login.
 
 Use `Check for Updates…` to open the Sparkle updater. Dock Tap also lets Sparkle handle scheduled background update prompts when a signed update is available.
 
@@ -34,13 +34,13 @@ If the menu shows Accessibility as missing, choose `Check Accessibility` to prom
 
 ## Menu
 
-The main menu shows current readiness, the selected trigger preset, and how many Dock shortcuts are assigned. The `Dock Shortcuts` submenu shows the Finder shortcut plus the full ten-slot Dock list.
+The main menu starts with `Shortcut Modifier`, then shows current readiness and how many Dock shortcuts are assigned. `Enable Dock Shortcuts` toggles Dock app and Finder shortcuts. `Dock Shortcut Bindings` shows the Finder shortcut plus the full ten-slot Dock list.
 
 Dock shortcuts update automatically on launch and each time the main menu opens. Use `Update Dock Shortcuts` as a manual fallback after changing Dock contents.
 
-## Trigger Presets
+## Shortcut Modifier
 
-The trigger modifier is fixed to one of five physical presets:
+The shortcut modifier is fixed to one of five physical presets:
 
 - Left Option (default)
 - Left Command
@@ -52,7 +52,7 @@ Only the selected physical key may be down. The opposite side or another Option,
 
 ## Window Snap
 
-Window Snap is off by default. Choose `Enable Window Snap` from the menu to let the same trigger preset resize the focused window:
+Window Snap is off by default. Choose `Enable Window Snap` from the menu to let the same shortcut modifier resize the focused window:
 
 | Shortcut | Action |
 | --- | --- |
@@ -63,13 +63,13 @@ Window Snap is off by default. Choose `Enable Window Snap` from the menu to let 
 | `<preset>+Return` | Maximize |
 | `<preset>+Space` | Center at 75% width and 75% height |
 
-The `Window Snap Bindings` submenu shows the exact bindings for the current trigger preset. Window Snap uses the focused window on its current display and does not cycle sizes or move windows between displays.
+The `Window Snap Bindings` submenu shows the exact bindings for the current shortcut modifier. Window Snap uses the focused window on its current display and does not cycle sizes or move windows between displays.
 
 When enabled, Window Snap uses the existing Accessibility trust to write other apps' window position and size, broadening Dock Tap's trust surface beyond app activation.
 
-When Window Snap is enabled, Dock Tap consumes those chords before the focused app or macOS global shortcut handlers see them. This affects editor and text-field shortcuts such as `Option+←` / `Option+→` word jumps or `Command+←` / `Command+→` line/document jumps when that same preset is selected. It also affects system shortcuts such as `Command+Space` for Spotlight if your trigger preset is Command, and `Control+Space` for input-source switching if your trigger preset is Control.
+When Window Snap is enabled, Dock Tap consumes those chords before the focused app or macOS global shortcut handlers see them. This affects editor and text-field shortcuts such as `Option+←` / `Option+→` word jumps or `Command+←` / `Command+→` line/document jumps when that same preset is selected. It also affects system shortcuts such as `Command+Space` for Spotlight if your shortcut modifier is Command, and `Control+Space` for input-source switching if your shortcut modifier is Control.
 
-Use the menu toggle as the quick escape hatch, or choose a trigger preset that does not overlap the shortcuts you rely on. If you want cycling, thirds, sixths, layouts, drag snapping, or cross-display window movement, Rectangle is the better tool for that full window-management suite.
+Use the menu toggle as the quick escape hatch, or choose a shortcut modifier that does not overlap the shortcuts you rely on. If you want cycling, thirds, sixths, layouts, drag snapping, or cross-display window movement, Rectangle is the better tool for that full window-management suite.
 
 ## Closed-Lid Keep Awake
 
@@ -101,7 +101,7 @@ The menu reads Launch at Login state from `SMAppService.mainApp.status`. If macO
 
 ## Known Limits
 
-Dock Tap is arm64-only and requires macOS 13 or newer. It reads Dock preferences on launch/menu open and treats Dock slots as read-only; it does not mutate Dock contents, remap slots, or support custom triggers. Window Snap covers only the listed fixed actions and is not a Rectangle replacement. Closed-Lid Keep Awake intentionally does not monitor battery level or thermals. Sparkle updates download the full DMG because delta updates are not currently published.
+Dock Tap is arm64-only and requires macOS 13 or newer. It reads Dock preferences on launch/menu open and treats Dock slots as read-only; it does not mutate Dock contents, remap slots, or support a custom shortcut modifier. Window Snap covers only the listed fixed actions and is not a Rectangle replacement. Closed-Lid Keep Awake intentionally does not monitor battery level or thermals. Sparkle updates download the full DMG because delta updates are not currently published.
 
 ## License
 

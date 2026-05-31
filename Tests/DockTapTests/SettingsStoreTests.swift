@@ -46,6 +46,22 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertFalse(store.windowActionsEnabled)
     }
 
+    func testDockShortcutsDefaultToEnabled() {
+        let store = SettingsStore(defaults: defaults)
+
+        XCTAssertTrue(store.dockShortcutsEnabled)
+    }
+
+    func testPersistsDockShortcutsEnabled() {
+        let store = SettingsStore(defaults: defaults)
+
+        store.dockShortcutsEnabled = false
+        XCTAssertFalse(SettingsStore(defaults: defaults).dockShortcutsEnabled)
+
+        store.dockShortcutsEnabled = true
+        XCTAssertTrue(SettingsStore(defaults: defaults).dockShortcutsEnabled)
+    }
+
     func testPersistsWindowActionsEnabled() {
         let store = SettingsStore(defaults: defaults)
 

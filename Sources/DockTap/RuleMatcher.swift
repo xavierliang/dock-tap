@@ -34,24 +34,27 @@ struct RuleMatcher {
         modifiers: ModifierSnapshot,
         triggerModifier: TriggerModifierPreset,
         slots: DockSlotSnapshot,
+        dockShortcutsEnabled: Bool,
         windowActionsEnabled: Bool
     ) -> ShortcutIntent? {
         guard triggerModifier.matches(modifiers) else {
             return nil
         }
 
-        if let shortcutIndex = digitShortcutIndexes[keyCode] {
-            guard let target = slots.target(shortcutIndex: shortcutIndex) else {
-                return nil
+        if dockShortcutsEnabled {
+            if let shortcutIndex = digitShortcutIndexes[keyCode] {
+                guard let target = slots.target(shortcutIndex: shortcutIndex) else {
+                    return nil
+                }
+                return .dockSlot(
+                    target,
+                    shortcutLabel: triggerModifier.shortcutLabel(forShortcutIndex: shortcutIndex)
+                )
             }
-            return .dockSlot(
-                target,
-                shortcutLabel: triggerModifier.shortcutLabel(forShortcutIndex: shortcutIndex)
-            )
-        }
 
-        if keyCode == KeyCodes.backtick {
-            return .finder(shortcutLabel: triggerModifier.shortcutLabel(forKeyLabel: "`"))
+            if keyCode == KeyCodes.backtick {
+                return .finder(shortcutLabel: triggerModifier.shortcutLabel(forKeyLabel: "`"))
+            }
         }
 
         if windowActionsEnabled, let action = windowActionsByKeyCode[keyCode] {

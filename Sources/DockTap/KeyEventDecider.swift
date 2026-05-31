@@ -26,6 +26,7 @@ struct KeyEventDecider {
         modifiers: ModifierSnapshot,
         triggerModifier: TriggerModifierPreset,
         slots: DockSlotSnapshot,
+        dockShortcutsEnabled: Bool = true,
         windowActionsEnabled: Bool
     ) -> KeyEventDecision {
         guard kind == .keyDown else {
@@ -37,6 +38,7 @@ struct KeyEventDecider {
             modifiers: modifiers,
             triggerModifier: triggerModifier,
             slots: slots,
+            dockShortcutsEnabled: dockShortcutsEnabled,
             windowActionsEnabled: windowActionsEnabled
         )
 

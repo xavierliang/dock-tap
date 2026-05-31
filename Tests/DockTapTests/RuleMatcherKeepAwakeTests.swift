@@ -31,6 +31,13 @@ final class RuleMatcherKeepAwakeTests: XCTestCase {
         XCTAssertTrue(enabled.consumesEvent)
     }
 
+    func testKeepAwakeKeysStillMatchWhenDockShortcutsAreDisabled() {
+        let decision = decide(keyCode: KeyCodes.a, dockShortcutsEnabled: false)
+
+        XCTAssertEqual(decision.intent, .keepAwake(.oneHour, shortcutLabel: "Left Option+A"))
+        XCTAssertTrue(decision.consumesEvent)
+    }
+
     func testKeepAwakeKeysRequireMatchingModifier() {
         let decision = decide(
             keyCode: KeyCodes.a,
@@ -71,6 +78,7 @@ final class RuleMatcherKeepAwakeTests: XCTestCase {
         keyCode: UInt16,
         triggerModifier: TriggerModifierPreset = .leftOption,
         modifiers: ModifierSnapshot? = nil,
+        dockShortcutsEnabled: Bool = true,
         windowActionsEnabled: Bool = false
     ) -> KeyEventDecision {
         decider.decide(
@@ -79,6 +87,7 @@ final class RuleMatcherKeepAwakeTests: XCTestCase {
             modifiers: modifiers ?? self.modifiers(with: [triggerModifier.physicalKeyCode]),
             triggerModifier: triggerModifier,
             slots: .empty,
+            dockShortcutsEnabled: dockShortcutsEnabled,
             windowActionsEnabled: windowActionsEnabled
         )
     }

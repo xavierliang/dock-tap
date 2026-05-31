@@ -75,11 +75,23 @@ final class RuleMatcherWindowActionTests: XCTestCase {
         XCTAssertTrue(backtick.consumesEvent)
     }
 
+    func testWindowActionsStillMatchWhenDockShortcutsAreDisabled() {
+        let decision = decide(
+            keyCode: KeyCodes.leftArrow,
+            dockShortcutsEnabled: false,
+            windowActionsEnabled: true
+        )
+
+        XCTAssertEqual(decision.intent, .windowAction(.leftHalf, shortcutLabel: "Left Option+←"))
+        XCTAssertTrue(decision.consumesEvent)
+    }
+
     private func decide(
         keyCode: UInt16,
         triggerModifier: TriggerModifierPreset = .leftOption,
         modifiers: ModifierSnapshot? = nil,
         slots: DockSlotSnapshot = .empty,
+        dockShortcutsEnabled: Bool = true,
         windowActionsEnabled: Bool
     ) -> KeyEventDecision {
         decider.decide(
@@ -88,6 +100,7 @@ final class RuleMatcherWindowActionTests: XCTestCase {
             modifiers: modifiers ?? self.modifiers(with: [triggerModifier.physicalKeyCode]),
             triggerModifier: triggerModifier,
             slots: slots,
+            dockShortcutsEnabled: dockShortcutsEnabled,
             windowActionsEnabled: windowActionsEnabled
         )
     }

@@ -10,9 +10,10 @@
 "dockShortcuts.count.other" = "%d Dock shortcuts";
 
 /* Menu */
-"menu.dockShortcuts" = "Dock Shortcuts";
-"menu.triggerModifier" = "Trigger Modifier";
-"menu.triggerModifierFormat" = "Trigger Modifier: %@";
+"menu.enableDockShortcuts" = "Enable Dock Shortcuts";
+"menu.dockShortcutBindings" = "Dock Shortcut Bindings";
+"menu.triggerModifier" = "Shortcut Modifier";
+"menu.triggerModifierFormat" = "Shortcut Modifier: %@";
 "menu.updateDockShortcuts" = "Update Dock Shortcuts";
 "menu.showLogs" = "Show Logs";
 "menu.checkAccessibility" = "Check Accessibility";

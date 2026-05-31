@@ -10,9 +10,10 @@
 "dockShortcuts.count.other" = "%d 个 Dock 快捷方式";
 
 /* Menu */
-"menu.dockShortcuts" = "Dock 快捷方式";
-"menu.triggerModifier" = "触发修饰键";
-"menu.triggerModifierFormat" = "触发修饰键：%@";
+"menu.enableDockShortcuts" = "启用 Dock 快捷方式";
+"menu.dockShortcutBindings" = "Dock 快捷键绑定";
+"menu.triggerModifier" = "快捷键修饰键";
+"menu.triggerModifierFormat" = "快捷键修饰键：%@";
 "menu.updateDockShortcuts" = "更新 Dock 快捷方式";
 "menu.showLogs" = "显示日志";
 "menu.checkAccessibility" = "检查辅助功能";

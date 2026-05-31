@@ -17,6 +17,7 @@ final class EventTapController {
 
     private var slotSnapshot = DockSlotSnapshot.empty
     private var triggerModifierPreset = TriggerModifierPreset.defaultPreset
+    private var dockShortcutsEnabled = true
     private var windowActionsEnabled = false
     private var modifierState = ModifierState()
     private var eventTap: CFMachPort?
@@ -53,6 +54,12 @@ final class EventTapController {
     func updateTriggerModifierPreset(_ preset: TriggerModifierPreset) {
         inputLock.lock()
         triggerModifierPreset = preset
+        inputLock.unlock()
+    }
+
+    func updateDockShortcutsEnabled(_ isEnabled: Bool) {
+        inputLock.lock()
+        dockShortcutsEnabled = isEnabled
         inputLock.unlock()
     }
 
@@ -155,6 +162,7 @@ final class EventTapController {
                 modifiers: modifierState.snapshot,
                 triggerModifier: input.triggerModifierPreset,
                 slots: input.slotSnapshot,
+                dockShortcutsEnabled: input.dockShortcutsEnabled,
                 windowActionsEnabled: input.windowActionsEnabled
             )
             if let intent = decision.intent {
@@ -176,11 +184,12 @@ final class EventTapController {
     private func currentInputSnapshot() -> (
         slotSnapshot: DockSlotSnapshot,
         triggerModifierPreset: TriggerModifierPreset,
+        dockShortcutsEnabled: Bool,
         windowActionsEnabled: Bool
     ) {
         inputLock.lock()
         defer { inputLock.unlock() }
-        return (slotSnapshot, triggerModifierPreset, windowActionsEnabled)
+        return (slotSnapshot, triggerModifierPreset, dockShortcutsEnabled, windowActionsEnabled)
     }
 
     private func runTapThread(installResult: TapInstallResult, generation: UInt64) {
