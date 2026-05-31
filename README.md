@@ -34,7 +34,7 @@ If the menu shows Accessibility as missing, choose `Check Accessibility` to prom
 
 ## Menu
 
-The main menu starts with current readiness and how many Dock shortcuts are assigned, followed by `Shortcut Modifier`. `Enable Dock Shortcuts` toggles Dock app and Finder shortcuts. `Dock Shortcut Bindings` shows the Finder shortcut plus the full ten-slot Dock list.
+The main menu starts with current readiness, followed by `Shortcut Modifier`. `Enable Dock Shortcuts` toggles Dock app and Finder shortcuts. `Dock Shortcut Bindings` shows the Finder shortcut plus the full ten-slot Dock list.
 
 Dock shortcuts update automatically on launch and each time the main menu opens. Use `Refresh Dock Shortcuts` as a manual fallback after changing Dock contents.
 

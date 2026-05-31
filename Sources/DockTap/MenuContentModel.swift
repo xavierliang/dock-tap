@@ -77,10 +77,7 @@ struct MenuContentModel: Equatable {
             isEventTapReady: isEventTapReady
         )
 
-        summaryTitle = [
-            statusTitle,
-            AppText.DockShortcuts.countTitle(assignedCount)
-        ].joined(separator: " · ")
+        summaryTitle = statusTitle
         assignedShortcutCount = assignedCount
         dockShortcutsToggleTitle = AppText.Menu.enableDockShortcuts
         dockShortcutsToggleIsOn = dockShortcutsEnabled

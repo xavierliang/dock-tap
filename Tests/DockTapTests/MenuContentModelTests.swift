@@ -88,7 +88,7 @@ final class MenuContentModelTests: XCTestCase {
         XCTAssertEqual(model.updateDockShortcutsTitle, "Refresh Dock Shortcuts")
     }
 
-    func testSummaryUsesAssignedShortcutCountCappedAtTenWithoutDiagnosticDetail() {
+    func testSummaryShowsOnlyCurrentStatus() {
         let model = MenuContentModel(
             dockRows: (0..<12).map { row(index: $0, name: "Dock App \($0 + 1)") },
             selectedPreset: .leftControl,
@@ -100,7 +100,8 @@ final class MenuContentModelTests: XCTestCase {
         )
 
         XCTAssertEqual(model.assignedShortcutCount, 10)
-        XCTAssertEqual(model.summaryTitle, "Ready · 10 Dock shortcuts")
+        XCTAssertEqual(model.summaryTitle, "Ready")
+        XCTAssertFalse(model.summaryTitle.contains("Dock shortcut"))
         XCTAssertFalse(model.summaryTitle.contains("skipped"))
         XCTAssertFalse(model.summaryTitle.contains("more"))
         XCTAssertFalse(model.summaryTitle.contains("Left Control"))
@@ -126,7 +127,7 @@ final class MenuContentModelTests: XCTestCase {
             appVersion: "0.0.0"
         )
 
-        XCTAssertEqual(missing.summaryTitle, "Missing Accessibility Permission · 0 Dock shortcuts")
+        XCTAssertEqual(missing.summaryTitle, "Missing Accessibility Permission")
         XCTAssertEqual(missing.checkAccessibilityTitle, "Check Accessibility")
         XCTAssertEqual(missing.openAccessibilitySettingsTitle, "Open Accessibility Settings")
         XCTAssertNil(trusted.checkAccessibilityTitle)
@@ -162,9 +163,9 @@ final class MenuContentModelTests: XCTestCase {
             appVersion: "0.0.0"
         )
 
-        XCTAssertEqual(missing.summaryTitle, "Missing Accessibility Permission · 0 Dock shortcuts")
-        XCTAssertEqual(starting.summaryTitle, "Starting · 0 Dock shortcuts")
-        XCTAssertEqual(ready.summaryTitle, "Ready · 0 Dock shortcuts")
+        XCTAssertEqual(missing.summaryTitle, "Missing Accessibility Permission")
+        XCTAssertEqual(starting.summaryTitle, "Starting")
+        XCTAssertEqual(ready.summaryTitle, "Ready")
     }
 
     func testSummaryShowsStartingWhenAccessibilityIsTrustedButTapIsNotReady() {
@@ -178,7 +179,7 @@ final class MenuContentModelTests: XCTestCase {
             appVersion: "0.0.0"
         )
 
-        XCTAssertEqual(model.summaryTitle, "Starting · 0 Dock shortcuts")
+        XCTAssertEqual(model.summaryTitle, "Starting")
     }
 
     func testWindowSnapToggleAndRowsUseSelectedPreset() {
