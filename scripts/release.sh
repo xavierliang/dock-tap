@@ -401,11 +401,26 @@ GENERATED="$STAGING/appcast.xml"
 # Rewrite each enclosure URL so the tag in the path matches the DMG's own
 # version (extracted from the filename), rather than the global prefix tag.
 log "Rewriting per-version enclosure URLs"
-ESCAPED_BASE="$(printf '%s' "$RELEASES_BASE" | /usr/bin/sed -e 's|[\\/.]|\\&|g')"
-/usr/bin/sed -E -i.bak \
-    "s|($ESCAPED_BASE)/v[0-9]+\\.[0-9]+\\.[0-9]+/DockTap-([0-9]+\\.[0-9]+\\.[0-9]+)-(arm64|universal)\\.dmg|\\1/v\\2/DockTap-\\2-\\3.dmg|g" \
-    "$GENERATED"
-rm -f "$GENERATED.bak"
+/usr/bin/ruby -rrexml/document -e '
+    base = ARGV.fetch(0)
+    path = ARGV.fetch(1)
+    doc = REXML::Document.new(File.read(path))
+
+    REXML::XPath.each(doc, "//enclosure") do |enclosure|
+        url = enclosure.attributes["url"].to_s
+        filename = url.split("/").last
+        next unless filename =~ /\ADockTap-([0-9]+\.[0-9]+\.[0-9]+)-(?:arm64|universal)\.dmg\z/
+
+        enclosure.attributes["url"] = "#{base}/v#{$1}/#{filename}"
+    end
+
+    formatter = REXML::Formatters::Pretty.new(4)
+    formatter.compact = true
+    File.open(path, "w") do |file|
+        formatter.write(doc, file)
+        file.write("\n")
+    end
+' "$RELEASES_BASE" "$GENERATED"
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
     validate_appcast_enclosure_urls \
