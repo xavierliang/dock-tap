@@ -4,7 +4,7 @@ Dock Tap is a macOS 13+ menu bar app that maps one physical modifier preset plus
 
 ## Install
 
-Download the latest notarized `DockTap-<version>-arm64.dmg` from GitHub Releases, open it, and drag `DockTap.app` to `/Applications`. Keeping Dock Tap in `/Applications` is also the supported path for the privileged Closed-Lid helper.
+Download the latest notarized `DockTap-<version>-universal.dmg` from GitHub Releases, open it, and drag `DockTap.app` to `/Applications`. Keeping Dock Tap in `/Applications` is also the supported path for the privileged Closed-Lid helper.
 
 On first launch, grant Dock Tap Accessibility access in System Settings. Dock Tap uses that permission to activate Dock apps and, when enabled, resize the focused window.
 
@@ -101,7 +101,7 @@ The menu reads Launch at Login state from `SMAppService.mainApp.status`. If macO
 
 ## Known Limits
 
-Dock Tap is arm64-only and requires macOS 13 or newer. It reads Dock preferences on launch/menu open and treats Dock slots as read-only; it does not mutate Dock contents, remap slots, or support a custom shortcut modifier. Window Snap covers only the listed fixed actions and is not a Rectangle replacement. Closed-Lid Keep Awake intentionally does not monitor battery level or thermals. Sparkle updates download the full DMG because delta updates are not currently published.
+Dock Tap requires macOS 13 or newer and ships as a Universal app for Apple silicon and Intel Macs. It reads Dock preferences on launch/menu open and treats Dock slots as read-only; it does not mutate Dock contents, remap slots, or support a custom shortcut modifier. Window Snap covers only the listed fixed actions and is not a Rectangle replacement. Closed-Lid Keep Awake intentionally does not monitor battery level or thermals. Sparkle updates download the full DMG because delta updates are not currently published.
 
 ## License
 

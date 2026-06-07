@@ -49,7 +49,7 @@ If those variables are missing, stop and report the missing variables unless the
 The signed and notarized DMG is written to:
 
 ```text
-dist/DockTap-<version>-arm64.dmg
+dist/DockTap-<version>-universal.dmg
 ```
 
 After the script completes, report the artifact path and SHA-256 printed by the script.

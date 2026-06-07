@@ -31,6 +31,7 @@ GH_REPO_OWNER="xavierliang"
 GH_REPO_NAME="dock-tap"
 GH_REPO="$GH_REPO_OWNER/$GH_REPO_NAME"
 RELEASES_BASE="https://github.com/$GH_REPO/releases/download"
+RELEASE_ARCH_LABEL="universal"
 
 NEW_VERSION=""
 NOTES_FILE=""
@@ -38,6 +39,16 @@ DRY_RUN=0
 
 log() { printf '[release] %s\n' "$*"; }
 fail() { printf '[release] ERROR: %s\n' "$*" >&2; exit 1; }
+
+release_dmg_name() {
+    local version="$1"
+    printf 'DockTap-%s-%s.dmg' "$version" "$RELEASE_ARCH_LABEL"
+}
+
+legacy_arm64_dmg_name() {
+    local version="$1"
+    printf 'DockTap-%s-arm64.dmg' "$version"
+}
 
 parse_appcast_xml() {
     /usr/bin/ruby -rrexml/document -e 'REXML::Document.new(File.read(ARGV.fetch(0)))' "$1" >/dev/null
@@ -314,7 +325,8 @@ swift test >/dev/null
 log "Packaging notarized DMG"
 "$ROOT/scripts/package-mac.sh"
 
-DMG="$DIST_DIR/DockTap-$NEW_VERSION-arm64.dmg"
+DMG_NAME="$(release_dmg_name "$NEW_VERSION")"
+DMG="$DIST_DIR/$DMG_NAME"
 [[ -f "$DMG" ]] || fail "expected DMG missing: $DMG"
 
 # ---- Commit version bump ------------------------------------------------------
@@ -355,15 +367,23 @@ while IFS= read -r tag; do
     [[ -n "$tag" ]] || continue
     [[ "$tag" != "v$NEW_VERSION" ]] || continue
     version="${tag#v}"
-    dmg_name="DockTap-$version-arm64.dmg"
-    [[ -f "$STAGING/$dmg_name" ]] && continue
-    if [[ -f "$DIST_DIR/$dmg_name" ]]; then
-        /bin/cp "$DIST_DIR/$dmg_name" "$STAGING/$dmg_name"
-        continue
+    found_historical_dmg=0
+    for dmg_name in "$(release_dmg_name "$version")" "$(legacy_arm64_dmg_name "$version")"; do
+        [[ -f "$STAGING/$dmg_name" ]] && { found_historical_dmg=1; break; }
+        if [[ -f "$DIST_DIR/$dmg_name" ]]; then
+            /bin/cp "$DIST_DIR/$dmg_name" "$STAGING/$dmg_name"
+            found_historical_dmg=1
+            break
+        fi
+        log "Downloading historical DMG for $tag: $dmg_name"
+        if gh release download "$tag" --repo "$GH_REPO" --pattern "$dmg_name" --dir "$STAGING"; then
+            found_historical_dmg=1
+            break
+        fi
+    done
+    if [[ "$found_historical_dmg" -eq 0 ]]; then
+        log "WARN: failed to fetch a supported DMG for $tag (will be omitted from appcast)"
     fi
-    log "Downloading historical DMG for $tag"
-    gh release download "$tag" --repo "$GH_REPO" --pattern "$dmg_name" --dir "$STAGING" \
-        || log "WARN: failed to fetch $dmg_name for $tag (will be omitted from appcast)"
 done < <(gh release list --repo "$GH_REPO" --json tagName --jq '.[].tagName')
 
 # ---- Generate + post-process appcast.xml --------------------------------------
@@ -383,14 +403,14 @@ GENERATED="$STAGING/appcast.xml"
 log "Rewriting per-version enclosure URLs"
 ESCAPED_BASE="$(printf '%s' "$RELEASES_BASE" | /usr/bin/sed -e 's|[\\/.]|\\&|g')"
 /usr/bin/sed -E -i.bak \
-    "s|($ESCAPED_BASE)/v[0-9]+\\.[0-9]+\\.[0-9]+/DockTap-([0-9]+\\.[0-9]+\\.[0-9]+)-arm64\\.dmg|\\1/v\\2/DockTap-\\2-arm64.dmg|g" \
+    "s|($ESCAPED_BASE)/v[0-9]+\\.[0-9]+\\.[0-9]+/DockTap-([0-9]+\\.[0-9]+\\.[0-9]+)-(arm64|universal)\\.dmg|\\1/v\\2/DockTap-\\2-\\3.dmg|g" \
     "$GENERATED"
 rm -f "$GENERATED.bak"
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
     validate_appcast_enclosure_urls \
         "$GENERATED" \
-        "$RELEASES_BASE/v$NEW_VERSION/DockTap-$NEW_VERSION-arm64.dmg"
+        "$RELEASES_BASE/v$NEW_VERSION/$DMG_NAME"
 
     trap - EXIT
     log "DRY-RUN: build, package, appcast generation, and validation succeeded"

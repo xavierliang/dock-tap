@@ -30,6 +30,8 @@ TMP_NOTARY_KEY=""
 FINAL_ARTIFACT=""
 PACKAGE_ARTIFACT=""
 FINAL_ARTIFACT_READY=0
+PACKAGE_ARCH_LABEL="universal"
+PACKAGE_ARCHS=(arm64 x86_64)
 
 log() {
     printf '[package-mac] %s\n' "$*"
@@ -160,6 +162,7 @@ strip_host_rpaths() {
 
     /usr/bin/otool -l "$executable" \
         | /usr/bin/awk '/cmd LC_RPATH/{want=1; next} want && /path /{print $2; want=0}' \
+        | /usr/bin/sort -u \
         | while IFS= read -r rpath; do
             case "$rpath" in
                 /Applications/Xcode*.app/*|/Library/Developer/CommandLineTools/*)
@@ -333,7 +336,9 @@ verify_artifact() {
 
 require_tool swift
 require_tool /usr/bin/codesign
+require_tool /usr/bin/file
 require_tool /usr/bin/hdiutil
+require_tool /usr/bin/lipo
 require_tool /usr/bin/xcrun
 require_tool /usr/sbin/spctl
 require_tool /usr/libexec/PlistBuddy
@@ -354,8 +359,8 @@ if [[ "$SKIP_NOTARIZE" == "1" ]]; then
 fi
 
 case "$ARTIFACT_KIND" in
-    dmg) FINAL_ARTIFACT="$DIST_DIR/$APP_NAME-$VERSION-arm64$NOTARY_SUFFIX.dmg" ;;
-    zip) FINAL_ARTIFACT="$DIST_DIR/$APP_NAME-$VERSION-arm64-debug.zip" ;;
+    dmg) FINAL_ARTIFACT="$DIST_DIR/$APP_NAME-$VERSION-$PACKAGE_ARCH_LABEL$NOTARY_SUFFIX.dmg" ;;
+    zip) FINAL_ARTIFACT="$DIST_DIR/$APP_NAME-$VERSION-$PACKAGE_ARCH_LABEL-debug.zip" ;;
     *) fail "unsupported artifact kind: $ARTIFACT_KIND" ;;
 esac
 
@@ -374,20 +379,64 @@ rm -f "$PACKAGE_ARTIFACT"
 
 cd "$ROOT"
 
-log "Building release arm64 SwiftPM products"
-swift build -c release --arch arm64 --product "$APP_NAME"
-swift build -c release --arch arm64 --product "$HELPER_NAME"
-BIN_DIR="$(swift build -c release --arch arm64 --show-bin-path)"
-BIN="$BIN_DIR/$APP_NAME"
-HELPER_BIN="$BIN_DIR/$HELPER_NAME"
-[[ -x "$BIN" ]] || fail "missing built executable: $BIN"
-[[ -x "$HELPER_BIN" ]] || fail "missing built helper executable: $HELPER_BIN"
+verify_required_arches() {
+    local binary="$1"
+    local label="$2"
+
+    if ! /usr/bin/lipo "$binary" -verify_arch "${PACKAGE_ARCHS[@]}" >/dev/null 2>&1; then
+        /usr/bin/file "$binary" >&2 || true
+        fail "$label is missing one or more required architectures: ${PACKAGE_ARCHS[*]}"
+    fi
+}
+
+create_universal_binary() {
+    local output="$1"
+    shift
+
+    rm -f "$output"
+    /usr/bin/lipo -create "$@" -output "$output"
+    verify_required_arches "$output" "$(basename "$output")"
+}
+
+BIN_INPUTS=()
+HELPER_BIN_INPUTS=()
+SPARKLE_FRAMEWORK_SRC=""
+
+for arch in "${PACKAGE_ARCHS[@]}"; do
+    log "Building release $arch SwiftPM products"
+    swift build -c release --arch "$arch" --product "$APP_NAME"
+    swift build -c release --arch "$arch" --product "$HELPER_NAME"
+
+    BIN_DIR="$(swift build -c release --arch "$arch" --show-bin-path)"
+    BIN="$BIN_DIR/$APP_NAME"
+    HELPER_BIN="$BIN_DIR/$HELPER_NAME"
+    [[ -x "$BIN" ]] || fail "missing built executable: $BIN"
+    [[ -x "$HELPER_BIN" ]] || fail "missing built helper executable: $HELPER_BIN"
+
+    ARCH_WORK_DIR="$WORK_DIR/thin/$arch"
+    ARCH_BIN="$ARCH_WORK_DIR/$APP_NAME"
+    ARCH_HELPER_BIN="$ARCH_WORK_DIR/$HELPER_NAME"
+    mkdir -p "$ARCH_WORK_DIR"
+    /bin/cp "$BIN" "$ARCH_BIN"
+    /bin/cp "$HELPER_BIN" "$ARCH_HELPER_BIN"
+    /bin/chmod +x "$ARCH_BIN" "$ARCH_HELPER_BIN"
+    strip_host_rpaths "$ARCH_BIN"
+    strip_host_rpaths "$ARCH_HELPER_BIN"
+
+    BIN_INPUTS+=("$ARCH_BIN")
+    HELPER_BIN_INPUTS+=("$ARCH_HELPER_BIN")
+    if [[ -z "$SPARKLE_FRAMEWORK_SRC" ]]; then
+        SPARKLE_FRAMEWORK_SRC="$BIN_DIR/Sparkle.framework"
+    fi
+done
+
+[[ -d "$SPARKLE_FRAMEWORK_SRC" ]] || fail "Sparkle.framework not found at $SPARKLE_FRAMEWORK_SRC; run a release SwiftPM build to fetch dependencies"
 
 log "Assembling $APP"
 rm -rf "$APP"
 mkdir -p "$MACOS" "$APP_RESOURCES" "$LAUNCH_DAEMONS"
-/bin/cp "$BIN" "$MACOS/$APP_NAME"
-/bin/cp "$HELPER_BIN" "$LAUNCH_DAEMONS/$HELPER_NAME"
+create_universal_binary "$MACOS/$APP_NAME" "${BIN_INPUTS[@]}"
+create_universal_binary "$LAUNCH_DAEMONS/$HELPER_NAME" "${HELPER_BIN_INPUTS[@]}"
 /bin/cp "$LAUNCH_DAEMON_PLIST_SRC" "$LAUNCH_DAEMONS/$LAUNCH_DAEMON_PLIST"
 /bin/cp "$INFO_PLIST" "$CONTENTS/Info.plist"
 copy_resource DockTap.icns
@@ -402,17 +451,11 @@ done
 verify_launch_daemon_plist "$LAUNCH_DAEMONS/$LAUNCH_DAEMON_PLIST"
 
 log "Fixing runtime search paths in main executable"
-# Strip absolute RPATHs pointing at the build machine's Xcode toolchain — they
-# leak host-specific paths into the shipped binary and at best cause failed
-# dyld lookups on user machines.
-strip_host_rpaths "$MACOS/$APP_NAME"
-strip_host_rpaths "$LAUNCH_DAEMONS/$HELPER_NAME"
+# Host-specific RPATHs are stripped from each thin binary before lipo so the
+# universal executable never ships build-machine toolchain paths.
 # Point dyld at the embedded Frameworks directory so @rpath/Sparkle.framework
 # resolves to Contents/Frameworks/Sparkle.framework.
 /usr/bin/install_name_tool -add_rpath "@executable_path/../Frameworks" "$MACOS/$APP_NAME"
-
-SPARKLE_FRAMEWORK_SRC="$BIN_DIR/Sparkle.framework"
-[[ -d "$SPARKLE_FRAMEWORK_SRC" ]] || fail "Sparkle.framework not found at $SPARKLE_FRAMEWORK_SRC; run 'swift build -c release --arch arm64' to fetch dependencies"
 
 log "Embedding Sparkle.framework"
 mkdir -p "$CONTENTS/Frameworks"
@@ -422,6 +465,15 @@ log "Signing Sparkle helpers bottom-up"
 SPARKLE_DST="$CONTENTS/Frameworks/Sparkle.framework"
 SPARKLE_CURRENT="$SPARKLE_DST/Versions/Current"
 [[ -d "$SPARKLE_CURRENT" ]] || fail "Sparkle.framework/Versions/Current not found in embedded framework"
+verify_required_arches "$SPARKLE_CURRENT/Sparkle" "Sparkle.framework binary"
+for sparkle_executable in \
+    "$SPARKLE_CURRENT/Autoupdate" \
+    "$SPARKLE_CURRENT/Updater.app/Contents/MacOS/Updater" \
+    "$SPARKLE_CURRENT/XPCServices/"*.xpc/Contents/MacOS/*; do
+    if [[ -e "$sparkle_executable" ]]; then
+        verify_required_arches "$sparkle_executable" "$(basename "$sparkle_executable")"
+    fi
+done
 
 sign_if_present() {
     local target="$1"
