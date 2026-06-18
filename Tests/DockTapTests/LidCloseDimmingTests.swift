@@ -122,6 +122,21 @@ final class LidCloseDimmingTests: XCTestCase {
         XCTAssertEqual(brightness.setValues, [0.0, 0.8], "lid open should restore saved brightness")
     }
 
+    func testLidOpenRestoresAtLeastMinimumBrightness() {
+        let brightness = FakeBrightnessController(current: 0.1)
+        let (controller, _, lid, _) = makeController(brightness: brightness)
+        controller.enableIndefinitely()
+
+        lid.emit(closed: true)
+        lid.emit(closed: false)
+
+        XCTAssertEqual(
+            brightness.setValues,
+            [0.0, 0.4],
+            "lid open should not restore to an already-dimmed close-time brightness"
+        )
+    }
+
     func testSessionStopRestoresWhenStillDimmed() {
         let (controller, brightness, lid, _) = makeController()
         controller.enableIndefinitely()

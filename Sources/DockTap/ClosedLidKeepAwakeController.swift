@@ -9,6 +9,10 @@ final class ClosedLidKeepAwakeController {
         static let prepareTimeout: TimeInterval = 60
     }
 
+    private enum LidDimming {
+        static let minimumRestoredBrightness = 0.40
+    }
+
     var onStateChanged: (() -> Void)?
 
     private(set) var state: ClosedLidKeepAwakeState = .off {
@@ -781,10 +785,11 @@ final class ClosedLidKeepAwakeController {
             return
         }
         savedBrightness = nil
-        if brightnessController.setInternalBrightness(saved) {
-            logStore.append("closed-lid restored built-in brightness to \(String(format: "%.2f", saved))")
+        let restored = max(saved, LidDimming.minimumRestoredBrightness)
+        if brightnessController.setInternalBrightness(restored) {
+            logStore.append("closed-lid restored built-in brightness to \(String(format: "%.2f", restored))")
         } else {
-            logStore.append("closed-lid failed to restore brightness to \(String(format: "%.2f", saved))")
+            logStore.append("closed-lid failed to restore brightness to \(String(format: "%.2f", restored))")
         }
     }
 }
