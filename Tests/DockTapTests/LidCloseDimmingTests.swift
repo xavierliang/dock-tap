@@ -53,6 +53,36 @@ private final class FakeLidObserver: LidStateObserving {
     }
 }
 
+private final class FakeBrightnessRestoreRetryScheduler {
+    final class Token {
+        var isCancelled = false
+        let block: () -> Void
+
+        init(block: @escaping () -> Void) {
+            self.block = block
+        }
+
+        func fire() {
+            guard !isCancelled else {
+                return
+            }
+            block()
+        }
+    }
+
+    private(set) var scheduledDelays: [TimeInterval] = []
+    private(set) var tokens: [Token] = []
+
+    func schedule(after delay: TimeInterval, block: @escaping () -> Void) -> () -> Void {
+        let token = Token(block: block)
+        scheduledDelays.append(delay)
+        tokens.append(token)
+        return {
+            token.isCancelled = true
+        }
+    }
+}
+
 private final class StubHelperClient: ClosedLidHelperClienting {
     var startResult: ClosedLidHelperStartResult
     var stopResult: ClosedLidHelperStopResult = .stopped
@@ -91,7 +121,12 @@ private final class StubHelperClient: ClosedLidHelperClienting {
 final class LidCloseDimmingTests: XCTestCase {
     private func makeController(
         brightness: FakeBrightnessController = FakeBrightnessController(),
-        lid: FakeLidObserver = FakeLidObserver()
+        lid: FakeLidObserver = FakeLidObserver(),
+        restoreRetryDelays: [TimeInterval] = [0.5, 1, 3],
+        restoreRetryScheduler: @escaping (
+            TimeInterval,
+            @escaping () -> Void
+        ) -> () -> Void = { _, _ in {} }
     ) -> (ClosedLidKeepAwakeController, FakeBrightnessController, FakeLidObserver, SettingsStore) {
         let defaults = UserDefaults(suiteName: "LidCloseDimmingTests-\(UUID().uuidString)")!
         let settings = SettingsStore(defaults: defaults)
@@ -105,7 +140,9 @@ final class LidCloseDimmingTests: XCTestCase {
             ),
             logStore: LogStore(),
             brightnessController: brightness,
-            lidObserver: lid
+            lidObserver: lid,
+            brightnessRestoreRetryDelays: restoreRetryDelays,
+            brightnessRestoreRetryScheduler: restoreRetryScheduler
         )
         return (controller, brightness, lid, settings)
     }
@@ -192,6 +229,94 @@ final class LidCloseDimmingTests: XCTestCase {
             [0.0, 0.0, 0.8],
             "failed dim must not block retry or restore a brightness that was never changed"
         )
+    }
+
+    func testRestoreFailureRetriesWithShortDelaysAndStopsAfterSuccess() {
+        let scheduler = FakeBrightnessRestoreRetryScheduler()
+        let (controller, brightness, lid, _) = makeController(
+            restoreRetryScheduler: scheduler.schedule(after:block:)
+        )
+        controller.enableIndefinitely()
+        lid.emit(closed: true)
+
+        brightness.setSucceeds = false
+        lid.emit(closed: false)
+        XCTAssertEqual(brightness.setValues, [0.0, 0.8])
+        XCTAssertEqual(scheduler.scheduledDelays, [0.5])
+
+        scheduler.tokens[0].fire()
+        XCTAssertEqual(brightness.setValues, [0.0, 0.8, 0.8])
+        XCTAssertEqual(scheduler.scheduledDelays, [0.5, 1])
+
+        brightness.setSucceeds = true
+        scheduler.tokens[1].fire()
+        XCTAssertEqual(brightness.setValues, [0.0, 0.8, 0.8, 0.8])
+        XCTAssertEqual(scheduler.scheduledDelays, [0.5, 1], "successful retry should not schedule more work")
+
+        lid.emit(closed: false)
+        XCTAssertEqual(brightness.setValues, [0.0, 0.8, 0.8, 0.8], "saved brightness should clear after success")
+    }
+
+    func testRestoreRetryGivesUpAfterConfiguredDelaysButKeepsSavedBrightness() {
+        let scheduler = FakeBrightnessRestoreRetryScheduler()
+        let (controller, brightness, lid, _) = makeController(
+            restoreRetryScheduler: scheduler.schedule(after:block:)
+        )
+        controller.enableIndefinitely()
+        lid.emit(closed: true)
+
+        brightness.setSucceeds = false
+        lid.emit(closed: false)
+        scheduler.tokens[0].fire()
+        scheduler.tokens[1].fire()
+        scheduler.tokens[2].fire()
+
+        XCTAssertEqual(scheduler.scheduledDelays, [0.5, 1, 3])
+        XCTAssertEqual(brightness.setValues, [0.0, 0.8, 0.8, 0.8, 0.8])
+
+        brightness.setSucceeds = true
+        lid.emit(closed: false)
+        XCTAssertEqual(
+            brightness.setValues,
+            [0.0, 0.8, 0.8, 0.8, 0.8, 0.8],
+            "giving up should stop timers, not discard the saved brightness"
+        )
+    }
+
+    func testLidCloseCancelsPendingRestoreRetry() {
+        let scheduler = FakeBrightnessRestoreRetryScheduler()
+        let (controller, brightness, lid, _) = makeController(
+            restoreRetryScheduler: scheduler.schedule(after:block:)
+        )
+        controller.enableIndefinitely()
+        lid.emit(closed: true)
+
+        brightness.setSucceeds = false
+        lid.emit(closed: false)
+        XCTAssertEqual(scheduler.scheduledDelays, [0.5])
+
+        lid.emit(closed: true)
+        XCTAssertTrue(scheduler.tokens[0].isCancelled)
+        scheduler.tokens[0].fire()
+        XCTAssertEqual(brightness.setValues, [0.0, 0.8])
+    }
+
+    func testInvalidateCancelsPendingRestoreRetryWithoutSchedulingAnother() {
+        let scheduler = FakeBrightnessRestoreRetryScheduler()
+        let (controller, brightness, lid, _) = makeController(
+            restoreRetryScheduler: scheduler.schedule(after:block:)
+        )
+        controller.enableIndefinitely()
+        lid.emit(closed: true)
+
+        brightness.setSucceeds = false
+        lid.emit(closed: false)
+        XCTAssertEqual(scheduler.scheduledDelays, [0.5])
+
+        controller.invalidate()
+        XCTAssertTrue(scheduler.tokens[0].isCancelled)
+        XCTAssertEqual(scheduler.scheduledDelays, [0.5])
+        XCTAssertEqual(brightness.setValues, [0.0, 0.8, 0.8])
     }
 }
 

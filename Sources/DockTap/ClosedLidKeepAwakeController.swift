@@ -11,6 +11,7 @@ final class ClosedLidKeepAwakeController {
 
     private enum LidDimming {
         static let minimumRestoredBrightness = 0.40
+        static let restoreRetryDelays: [TimeInterval] = [0.5, 1, 3]
     }
 
     var onStateChanged: (() -> Void)?
@@ -29,12 +30,19 @@ final class ClosedLidKeepAwakeController {
     private let logStore: LogStore
     private let brightnessController: BrightnessControlling
     private let lidObserver: LidStateObserving
+    private let brightnessRestoreRetryDelays: [TimeInterval]
+    private let scheduleBrightnessRestoreRetry: (
+        TimeInterval,
+        @escaping () -> Void
+    ) -> () -> Void
     private let approvalFollowUpMaxAttempts: Int
     private let approvalFollowUpRetryInterval: TimeInterval
     private let approvalFollowUpPrepareTimeout: TimeInterval
 
     /// 合盖压暗前保存的亮度；非 nil 即表示"当前处于压暗状态"，用于幂等恢复。
     private var savedBrightness: Double?
+    private var brightnessRestoreRetryCancellation: (() -> Void)?
+    private var brightnessRestoreRetryAttempt = 0
 
     private var renewalTimer: Timer?
     private var stopTimeoutTimer: Timer?
@@ -63,6 +71,11 @@ final class ClosedLidKeepAwakeController {
         logStore: LogStore,
         brightnessController: BrightnessControlling? = nil,
         lidObserver: LidStateObserving? = nil,
+        brightnessRestoreRetryDelays: [TimeInterval] = LidDimming.restoreRetryDelays,
+        brightnessRestoreRetryScheduler: @escaping (
+            TimeInterval,
+            @escaping () -> Void
+        ) -> () -> Void = ClosedLidKeepAwakeController.defaultBrightnessRestoreRetryScheduler,
         approvalFollowUpMaxAttempts: Int = ApprovalFollowUp.maxAttempts,
         approvalFollowUpRetryInterval: TimeInterval = ApprovalFollowUp.retryInterval,
         approvalFollowUpPrepareTimeout: TimeInterval = ApprovalFollowUp.prepareTimeout
@@ -73,6 +86,8 @@ final class ClosedLidKeepAwakeController {
         self.brightnessController = brightnessController
             ?? BrightnessController(log: { logStore.append($0) })
         self.lidObserver = lidObserver ?? LidStateObserver()
+        self.brightnessRestoreRetryDelays = brightnessRestoreRetryDelays
+        self.scheduleBrightnessRestoreRetry = brightnessRestoreRetryScheduler
         self.approvalFollowUpMaxAttempts = approvalFollowUpMaxAttempts
         self.approvalFollowUpRetryInterval = approvalFollowUpRetryInterval
         self.approvalFollowUpPrepareTimeout = approvalFollowUpPrepareTimeout
@@ -124,8 +139,22 @@ final class ClosedLidKeepAwakeController {
         renewalTimer?.invalidate()
         stopTimeoutTimer?.invalidate()
         cancelApprovalFollowUp()
-        endLidDimming()
+        endLidDimming(allowBrightnessRestoreRetry: false)
         helperClient.invalidate()
+    }
+
+    private static func defaultBrightnessRestoreRetryScheduler(
+        delay: TimeInterval,
+        block: @escaping () -> Void
+    ) -> () -> Void {
+        let timer = Timer(timeInterval: delay, repeats: false) { _ in
+            block()
+        }
+        timer.tolerance = min(0.25, max(0, delay / 2))
+        RunLoop.main.add(timer, forMode: .common)
+        return {
+            timer.invalidate()
+        }
     }
 
     private func start(duration: TimeInterval?, logMode: String) {
@@ -748,9 +777,9 @@ final class ClosedLidKeepAwakeController {
     }
 
     /// 停止监听并兜底恢复亮度（正常情况下开盖已恢复，此处覆盖"合盖中会话结束"等场景）。
-    private func endLidDimming() {
+    private func endLidDimming(allowBrightnessRestoreRetry: Bool = true) {
         lidObserver.stop()
-        restoreBrightnessIfDimmed()
+        restoreBrightnessIfDimmed(allowRetry: allowBrightnessRestoreRetry)
     }
 
     private func handleLidStateChanged(closed: Bool) {
@@ -758,6 +787,7 @@ final class ClosedLidKeepAwakeController {
             return
         }
         if closed {
+            cancelBrightnessRestoreRetry(resetAttempt: true)
             dimForLidClosed()
         } else {
             restoreBrightnessIfDimmed()
@@ -780,16 +810,51 @@ final class ClosedLidKeepAwakeController {
         }
     }
 
-    private func restoreBrightnessIfDimmed() {
+    private func restoreBrightnessIfDimmed(allowRetry: Bool = true) {
         guard let saved = savedBrightness else {
+            cancelBrightnessRestoreRetry(resetAttempt: true)
             return
         }
-        savedBrightness = nil
+
+        cancelBrightnessRestoreRetry(resetAttempt: false)
         let restored = max(saved, LidDimming.minimumRestoredBrightness)
         if brightnessController.setInternalBrightness(restored) {
+            savedBrightness = nil
+            brightnessRestoreRetryAttempt = 0
             logStore.append("closed-lid restored built-in brightness to \(String(format: "%.2f", restored))")
         } else {
             logStore.append("closed-lid failed to restore brightness to \(String(format: "%.2f", restored))")
+            if allowRetry {
+                scheduleBrightnessRestoreRetryIfNeeded(target: restored)
+            }
+        }
+    }
+
+    private func scheduleBrightnessRestoreRetryIfNeeded(target: Double) {
+        guard brightnessRestoreRetryAttempt < brightnessRestoreRetryDelays.count else {
+            logStore.append("closed-lid gave up restoring brightness to \(String(format: "%.2f", target))")
+            return
+        }
+
+        let retryNumber = brightnessRestoreRetryAttempt + 1
+        let delay = brightnessRestoreRetryDelays[brightnessRestoreRetryAttempt]
+        brightnessRestoreRetryAttempt = retryNumber
+        let delayText = String(format: "%.1f", delay)
+        let targetText = String(format: "%.2f", target)
+        logStore.append(
+            "closed-lid restore brightness retry=\(retryNumber) delay=\(delayText)s target=\(targetText)"
+        )
+
+        brightnessRestoreRetryCancellation = scheduleBrightnessRestoreRetry(delay) { [weak self] in
+            self?.restoreBrightnessIfDimmed()
+        }
+    }
+
+    private func cancelBrightnessRestoreRetry(resetAttempt: Bool) {
+        brightnessRestoreRetryCancellation?()
+        brightnessRestoreRetryCancellation = nil
+        if resetAttempt {
+            brightnessRestoreRetryAttempt = 0
         }
     }
 }
