@@ -77,15 +77,15 @@ The `Closed-Lid Keep Awake` submenu can keep the Mac awake with the lid closed b
 
 Menu commands:
 
-- `Enable for 1 Hour` starts a timed session. The helper owns the one-hour expiry and restores normal lid sleep when it ends.
-- `Enable Indefinitely` starts a session with no wall-clock expiry, but Dock Tap must keep renewing its helper lease. If Dock Tap quits, crashes, or stops renewing, the helper restores normal lid sleep.
-- `Stop Now` restores normal lid sleep immediately by running `pmset -a disablesleep 0`.
+- `Enable for 1 Hour` starts a timed session. The helper owns the one-hour expiry and restores normal lid sleep when it ends. Choosing this also clears any saved “resume indefinitely” intent.
+- `Enable Indefinitely` starts a session with no wall-clock expiry, but Dock Tap must keep renewing its helper lease. If Dock Tap quits, crashes, or stops renewing, the helper restores normal lid sleep while the app is not running. Dock Tap remembers this choice and restores indefinite mode the next time it launches (including after a Mac restart if Launch at Login is on).
+- `Stop Now` restores normal lid sleep immediately by running `pmset -a disablesleep 0`, and clears the saved resume intent so the next launch stays off.
 
 The first enable shows a warning because this changes normal lid-sleep behavior and can increase battery drain and heat. Use it only on a ventilated surface. After you continue once, Dock Tap remembers the acknowledgement.
 
 The helper is registered lazily on first use, not at app launch. macOS may require approval in System Settings > General > Login Items & Extensions; when approval is pending, the submenu shows `Helper approval required` and offers `Open Login Items Settings...`.
 
-While a closed-lid session is active, both enable commands are disabled. To switch between timed and indefinite modes, choose `Stop Now` first. Dock Tap does not automatically re-enable a previous session on launch.
+While a closed-lid session is active, both enable commands are disabled. To switch between timed and indefinite modes, choose `Stop Now` first. Timed sessions are never restored on launch; only a previous `Enable Indefinitely` choice is.
 
 Dock Tap blocks normal quit and Sparkle update installation until the helper confirms `pmset -a disablesleep 0`. If that confirmation fails, Dock Tap stays open and shows the manual recovery command:
 

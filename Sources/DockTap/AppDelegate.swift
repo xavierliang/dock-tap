@@ -80,7 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         startHealthReconcileTimer()
         reconcilePermissionAndTapHealth(prompt: true, reason: "launch")
         _ = updateController
-        closedLidController.refreshStatus()
+        closedLidController.restoreClosedLidSessionIfNeeded()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -371,6 +371,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             dockShortcutsEnabled: dockShortcutsEnabled,
             windowActionsEnabled: windowActionsEnabled,
             closedLidState: closedLidController.state,
+            shouldResumeClosedLidIndefinitely: settingsStore.shouldResumeClosedLidIndefinitely,
             appName: appName,
             appVersion: appVersion,
             availableUpdateVersion: updateController.availableUpdateVersion

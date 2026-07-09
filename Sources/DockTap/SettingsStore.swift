@@ -6,6 +6,7 @@ final class SettingsStore {
         static let dockShortcutsEnabled = "dockShortcutsEnabled"
         static let windowActionsEnabled = "windowActionsEnabled"
         static let hasSeenClosedLidWarning = "hasSeenClosedLidWarning"
+        static let shouldResumeClosedLidIndefinitely = "shouldResumeClosedLidIndefinitely"
     }
 
     private let defaults: UserDefaults
@@ -53,6 +54,17 @@ final class SettingsStore {
         }
         set {
             defaults.set(newValue, forKey: Keys.hasSeenClosedLidWarning)
+        }
+    }
+
+    /// User chose Enable Indefinitely; restore that mode after Dock Tap (or the Mac) restarts.
+    /// Cleared by Stop Now or by starting a timed session. Not cleared on quit/update.
+    var shouldResumeClosedLidIndefinitely: Bool {
+        get {
+            defaults.bool(forKey: Keys.shouldResumeClosedLidIndefinitely)
+        }
+        set {
+            defaults.set(newValue, forKey: Keys.shouldResumeClosedLidIndefinitely)
         }
     }
 }

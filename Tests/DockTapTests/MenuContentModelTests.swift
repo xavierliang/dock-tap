@@ -224,6 +224,31 @@ final class MenuContentModelTests: XCTestCase {
         XCTAssertEqual(items.map(\.action), expectedActions)
     }
 
+    func testClosedLidMenuOffWithResumeIntentShowsStopToClear() {
+        let items = model(closedLidState: .off, shouldResume: true).closedLidMenu.items
+        let expectedActions: [ClosedLidAction?] = [nil, .enableOneHour, .enableIndefinitely, .stop]
+
+        XCTAssertEqual(items.map(\.action), expectedActions)
+        XCTAssertEqual(items.last?.title, "Left Option+D  Stop Now")
+    }
+
+    func testClosedLidMenuErrorWithResumeIntentShowsStopToClear() {
+        let items = model(
+            closedLidState: .error("helper unavailable"),
+            shouldResume: true
+        ).closedLidMenu.items
+        let expectedActions: [ClosedLidAction?] = [nil, nil, .enableOneHour, .enableIndefinitely, .stop]
+
+        XCTAssertEqual(items.map(\.action), expectedActions)
+    }
+
+    func testClosedLidMenuRequiresApprovalWithResumeIntentShowsClearAndSettings() {
+        let items = model(closedLidState: .requiresApproval, shouldResume: true).closedLidMenu.items
+        let expectedActions: [ClosedLidAction?] = [nil, nil, .openApprovalSettings, .stop]
+
+        XCTAssertEqual(items.map(\.action), expectedActions)
+    }
+
     func testClosedLidMenuActiveTimedShowsStatusAndStopOnly() {
         let endDate = Date(timeIntervalSinceReferenceDate: 8_000)
         let items = model(closedLidState: .activeTimed(endDate: endDate)).closedLidMenu.items
@@ -355,7 +380,10 @@ final class MenuContentModelTests: XCTestCase {
         XCTAssertEqual(withUpdate.updateAvailableTitle, "Update Available: v0.2.0")
     }
 
-    private func model(closedLidState: ClosedLidKeepAwakeState) -> MenuContentModel {
+    private func model(
+        closedLidState: ClosedLidKeepAwakeState,
+        shouldResume: Bool = false
+    ) -> MenuContentModel {
         MenuContentModel(
             dockRows: [],
             selectedPreset: .leftOption,
@@ -363,6 +391,7 @@ final class MenuContentModelTests: XCTestCase {
             isEventTapReady: true,
             windowActionsEnabled: false,
             closedLidState: closedLidState,
+            shouldResumeClosedLidIndefinitely: shouldResume,
             appName: "Dock Tap",
             appVersion: "0.0.0"
         )

@@ -89,6 +89,227 @@ final class ClosedLidKeepAwakeControllerTests: XCTestCase {
         XCTAssertEqual(helperClient.stopTokens, ["forever-token"])
         XCTAssertEqual(helperClient.stopReasons, ["menu"])
         XCTAssertEqual(controller.state, .off)
+        XCTAssertFalse(settingsStore.shouldResumeClosedLidIndefinitely)
+    }
+
+    func testEnableIndefinitelyStoresResumeIntent() {
+        settingsStore.hasSeenClosedLidWarning = true
+        helperClient.startResults.append(.started(.indefinite(token: "forever-token")))
+
+        controller.enableIndefinitely()
+
+        XCTAssertTrue(settingsStore.shouldResumeClosedLidIndefinitely)
+        XCTAssertEqual(controller.state, .activeIndefinite)
+    }
+
+    func testEnableForOneHourDoesNotStoreResumeIntent() {
+        settingsStore.hasSeenClosedLidWarning = true
+        helperClient.startResults.append(.started(.timed(token: "timed-token", endDate: Date())))
+
+        controller.enableForOneHour()
+
+        XCTAssertFalse(settingsStore.shouldResumeClosedLidIndefinitely)
+    }
+
+    func testEnableForOneHourClearsExistingResumeIntent() {
+        settingsStore.hasSeenClosedLidWarning = true
+        settingsStore.shouldResumeClosedLidIndefinitely = true
+        helperClient.startResults.append(.started(.timed(token: "timed-token", endDate: Date())))
+
+        controller.enableForOneHour()
+
+        XCTAssertFalse(settingsStore.shouldResumeClosedLidIndefinitely)
+        XCTAssertEqual(helperClient.startDurations.count, 1)
+        XCTAssertEqual(helperClient.startDurations[0], 3_600)
+    }
+
+    func testEnableForOneHourWithAlreadyActiveIndefiniteDoesNotStoreResumeIntent() {
+        settingsStore.hasSeenClosedLidWarning = true
+        settingsStore.shouldResumeClosedLidIndefinitely = true
+        helperClient.startResults.append(.alreadyActive(.indefinite(token: "existing-token")))
+
+        controller.enableForOneHour()
+
+        XCTAssertFalse(settingsStore.shouldResumeClosedLidIndefinitely)
+        XCTAssertEqual(controller.state, .activeIndefinite)
+    }
+
+    func testFailedIndefiniteStartDoesNotStoreResumeIntent() {
+        settingsStore.hasSeenClosedLidWarning = true
+        helperClient.startResults.append(.failure("helper start failed"))
+
+        controller.enableIndefinitely()
+
+        XCTAssertFalse(settingsStore.shouldResumeClosedLidIndefinitely)
+        XCTAssertEqual(controller.state, .error("helper start failed"))
+    }
+
+    func testLaunchRestoreStartsIndefiniteWhenResumeIntentIsSet() {
+        settingsStore.hasSeenClosedLidWarning = true
+        settingsStore.shouldResumeClosedLidIndefinitely = true
+        helperClient.startResults.append(.started(.indefinite(token: "restore-token")))
+
+        controller.restoreClosedLidSessionIfNeeded()
+
+        XCTAssertEqual(helperClient.startDurations.count, 1)
+        XCTAssertNil(helperClient.startDurations[0])
+        XCTAssertEqual(controller.state, .activeIndefinite)
+        XCTAssertTrue(settingsStore.shouldResumeClosedLidIndefinitely)
+    }
+
+    func testLaunchRestoreWithFalseIntentOnlyRefreshesStatus() {
+        settingsStore.shouldResumeClosedLidIndefinitely = false
+        helperClient.statusResults.append(.inactive)
+
+        controller.restoreClosedLidSessionIfNeeded()
+
+        XCTAssertTrue(helperClient.startDurations.isEmpty)
+        XCTAssertEqual(controller.state, .off)
+        XCTAssertFalse(settingsStore.shouldResumeClosedLidIndefinitely)
+    }
+
+    func testStopBeforeTerminationPreservesResumeIntent() {
+        settingsStore.hasSeenClosedLidWarning = true
+        helperClient.startResults.append(.started(.indefinite(token: "quit-token")))
+        controller.enableIndefinitely()
+        XCTAssertTrue(settingsStore.shouldResumeClosedLidIndefinitely)
+
+        var completion: (success: Bool, message: String?)?
+        controller.stopBeforeTermination(reason: "quit") { success, message in
+            completion = (success, message)
+        }
+
+        XCTAssertEqual(completion?.success, true)
+        XCTAssertEqual(controller.state, .off)
+        XCTAssertTrue(settingsStore.shouldResumeClosedLidIndefinitely)
+        XCTAssertEqual(helperClient.stopReasons, ["quit"])
+    }
+
+    func testSparkleStopBeforeTerminationPreservesResumeIntent() {
+        settingsStore.hasSeenClosedLidWarning = true
+        helperClient.startResults.append(.started(.indefinite(token: "update-token")))
+        controller.enableIndefinitely()
+
+        var completion: (success: Bool, message: String?)?
+        controller.stopBeforeTermination(reason: "sparkle-update") { success, message in
+            completion = (success, message)
+        }
+
+        XCTAssertEqual(completion?.success, true)
+        XCTAssertTrue(settingsStore.shouldResumeClosedLidIndefinitely)
+        XCTAssertEqual(helperClient.stopReasons, ["sparkle-update"])
+    }
+
+    func testStopNowDuringStartingClearsResumeIntentAndBlocksLateWrite() {
+        settingsStore.hasSeenClosedLidWarning = true
+
+        controller.enableIndefinitely()
+        XCTAssertEqual(controller.state, .starting)
+
+        controller.stopNow()
+        XCTAssertFalse(settingsStore.shouldResumeClosedLidIndefinitely)
+
+        helperClient.completePendingStart(.started(.indefinite(token: "late-token")))
+
+        XCTAssertEqual(helperClient.stopTokens, ["late-token"])
+        XCTAssertEqual(helperClient.stopReasons, ["menu"])
+        XCTAssertEqual(controller.state, .off)
+        XCTAssertFalse(settingsStore.shouldResumeClosedLidIndefinitely)
+    }
+
+    func testStopBeforeTerminationDuringUserIndefiniteStartWritesResumeIntentThenStops() {
+        settingsStore.hasSeenClosedLidWarning = true
+
+        controller.enableIndefinitely()
+        XCTAssertEqual(controller.state, .starting)
+
+        var completion: (success: Bool, message: String?)?
+        controller.stopBeforeTermination(reason: "quit") { success, message in
+            completion = (success, message)
+        }
+
+        helperClient.completePendingStart(.started(.indefinite(token: "late-indefinite")))
+
+        XCTAssertEqual(completion?.success, true)
+        XCTAssertEqual(helperClient.stopTokens, ["late-indefinite"])
+        XCTAssertEqual(helperClient.stopReasons, ["quit"])
+        XCTAssertEqual(controller.state, .off)
+        XCTAssertTrue(settingsStore.shouldResumeClosedLidIndefinitely)
+    }
+
+    func testStopBeforeTerminationDuringTimedStartDoesNotStoreResumeIntentEvenIfAlreadyActiveIndefinite() {
+        settingsStore.hasSeenClosedLidWarning = true
+
+        controller.enableForOneHour()
+
+        var completion: (success: Bool, message: String?)?
+        controller.stopBeforeTermination(reason: "quit") { success, message in
+            completion = (success, message)
+        }
+
+        helperClient.completePendingStart(.alreadyActive(.indefinite(token: "existing-indefinite")))
+
+        XCTAssertEqual(completion?.success, true)
+        XCTAssertEqual(controller.state, .off)
+        XCTAssertFalse(settingsStore.shouldResumeClosedLidIndefinitely)
+    }
+
+    func testApprovalFollowUpForUserIndefiniteStoresResumeIntent() {
+        settingsStore.hasSeenClosedLidWarning = true
+        helperClient.prepareResults = [.requiresApproval, .ready]
+        helperClient.startResults.append(.started(.indefinite(token: "approved-indefinite")))
+        AlertRunModalStub.response = .alertFirstButtonReturn
+
+        controller.enableIndefinitely()
+
+        XCTAssertEqual(controller.state, .activeIndefinite)
+        XCTAssertTrue(settingsStore.shouldResumeClosedLidIndefinitely)
+    }
+
+    func testLaunchRestoreFailureKeepsResumeIntent() {
+        settingsStore.hasSeenClosedLidWarning = true
+        settingsStore.shouldResumeClosedLidIndefinitely = true
+        helperClient.startResults.append(.failure("helper unavailable"))
+
+        controller.restoreClosedLidSessionIfNeeded()
+
+        XCTAssertEqual(controller.state, .error("helper unavailable"))
+        XCTAssertTrue(settingsStore.shouldResumeClosedLidIndefinitely)
+    }
+
+    func testLaunchRestoreRequiresApprovalKeepsResumeIntent() {
+        settingsStore.hasSeenClosedLidWarning = true
+        settingsStore.shouldResumeClosedLidIndefinitely = true
+        helperClient.prepareResults = [.requiresApproval]
+        AlertRunModalStub.response = .alertSecondButtonReturn
+
+        controller.restoreClosedLidSessionIfNeeded()
+
+        XCTAssertEqual(controller.state, .requiresApproval)
+        XCTAssertTrue(settingsStore.shouldResumeClosedLidIndefinitely)
+    }
+
+    func testStopNowFromInactiveStateClearsResumeIntent() {
+        settingsStore.shouldResumeClosedLidIndefinitely = true
+
+        controller.stopNow()
+
+        XCTAssertFalse(settingsStore.shouldResumeClosedLidIndefinitely)
+        XCTAssertEqual(controller.state, .off)
+    }
+
+    func testRenewalInactiveDoesNotClearResumeIntent() {
+        settingsStore.hasSeenClosedLidWarning = true
+        helperClient.startResults.append(.started(.indefinite(token: "renew-token")))
+        helperClient.renewResults.append(.inactive)
+
+        controller.enableIndefinitely()
+        XCTAssertTrue(settingsStore.shouldResumeClosedLidIndefinitely)
+
+        controller.renewLease()
+
+        XCTAssertEqual(controller.state, .off)
+        XCTAssertTrue(settingsStore.shouldResumeClosedLidIndefinitely)
     }
 
     func testAlreadyActiveResultAdoptsHelperSessionAndSuppressesModeSwitching() {

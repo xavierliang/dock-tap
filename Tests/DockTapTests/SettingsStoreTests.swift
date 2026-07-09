@@ -95,4 +95,20 @@ final class SettingsStoreTests: XCTestCase {
         store.hasSeenClosedLidWarning = false
         XCTAssertFalse(SettingsStore(defaults: defaults).hasSeenClosedLidWarning)
     }
+
+    func testClosedLidResumeIntentDefaultsToFalse() {
+        let store = SettingsStore(defaults: defaults)
+
+        XCTAssertFalse(store.shouldResumeClosedLidIndefinitely)
+    }
+
+    func testPersistsClosedLidResumeIntent() {
+        let store = SettingsStore(defaults: defaults)
+
+        store.shouldResumeClosedLidIndefinitely = true
+        XCTAssertTrue(SettingsStore(defaults: defaults).shouldResumeClosedLidIndefinitely)
+
+        store.shouldResumeClosedLidIndefinitely = false
+        XCTAssertFalse(SettingsStore(defaults: defaults).shouldResumeClosedLidIndefinitely)
+    }
 }

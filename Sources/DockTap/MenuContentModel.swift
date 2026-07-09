@@ -66,6 +66,7 @@ struct MenuContentModel: Equatable {
         dockShortcutsEnabled: Bool = true,
         windowActionsEnabled: Bool,
         closedLidState: ClosedLidKeepAwakeState = .off,
+        shouldResumeClosedLidIndefinitely: Bool = false,
         appName: String,
         appVersion: String,
         availableUpdateVersion: String? = nil
@@ -102,7 +103,11 @@ struct MenuContentModel: Equatable {
         windowSnapToggleIsOn = windowActionsEnabled
         windowSnapSubmenuTitle = AppText.WindowSnap.submenuTitle
         windowSnapRows = Self.windowSnapRows(selectedPreset: selectedPreset)
-        closedLidMenu = Self.closedLidMenu(state: closedLidState, selectedPreset: selectedPreset)
+        closedLidMenu = Self.closedLidMenu(
+            state: closedLidState,
+            shouldResumeClosedLidIndefinitely: shouldResumeClosedLidIndefinitely,
+            selectedPreset: selectedPreset
+        )
         updateDockShortcutsTitle = AppText.Menu.updateDockShortcuts
         showLogsTitle = AppText.Menu.showLogs
         checkAccessibilityTitle = isAccessibilityTrusted ? nil : AppText.Menu.checkAccessibility
@@ -159,6 +164,7 @@ struct MenuContentModel: Equatable {
 
     private static func closedLidMenu(
         state: ClosedLidKeepAwakeState,
+        shouldResumeClosedLidIndefinitely: Bool,
         selectedPreset: TriggerModifierPreset
     ) -> ClosedLidMenu {
         func shortcutItem(
@@ -184,10 +190,16 @@ struct MenuContentModel: Equatable {
         case .off:
             items.append(enableOneHour)
             items.append(enableIndefinitely)
+            if shouldResumeClosedLidIndefinitely {
+                items.append(stop)
+            }
         case .error:
             items.append(statusLine)
             items.append(enableOneHour)
             items.append(enableIndefinitely)
+            if shouldResumeClosedLidIndefinitely {
+                items.append(stop)
+            }
         case .activeTimed, .activeIndefinite, .errorWithActiveSession, .stopFailed:
             items.append(statusLine)
             items.append(stop)
@@ -197,6 +209,9 @@ struct MenuContentModel: Equatable {
                 title: AppText.ClosedLid.openLoginItemsSettings,
                 action: .openApprovalSettings
             ))
+            if shouldResumeClosedLidIndefinitely {
+                items.append(stop)
+            }
         case .starting, .stopping:
             items.append(statusLine)
         }

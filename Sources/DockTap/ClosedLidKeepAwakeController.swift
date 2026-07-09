@@ -14,6 +14,13 @@ final class ClosedLidKeepAwakeController {
         static let restoreRetryDelays: [TimeInterval] = [0.5, 1, 3]
     }
 
+    /// Who initiated the current start attempt. Persistence keys off this, not helper mode alone.
+    private enum StartSource {
+        case userTimed
+        case userIndefinite
+        case launchRestore
+    }
+
     var onStateChanged: (() -> Void)?
 
     private(set) var state: ClosedLidKeepAwakeState = .off {
@@ -55,11 +62,15 @@ final class ClosedLidKeepAwakeController {
     private var stopRequestedDuringStart = false
     private var approvalFollowUpTimer: Timer?
     private var approvalFollowUpDuration: TimeInterval?
+    private var approvalFollowUpSource: StartSource?
     private var approvalFollowUpAttemptsRemaining = 0
     private var approvalFollowUpPrepareInFlight = false
     private var approvalFollowUpGeneration = 0
     private var activeApprovalFollowUpGeneration: Int?
     private var approvalAlertShownForCurrentStart = false
+    private var pendingStartSource: StartSource?
+    /// Set by `stopNow()` so a late start success cannot re-persist resume intent.
+    private var suppressResumeIntentWrite = false
 
     var requiresStopGate: Bool {
         state.canStopSession || isStopInFlight || hasPendingApprovalFollowUpStart
@@ -110,15 +121,27 @@ final class ClosedLidKeepAwakeController {
         }
     }
 
+    /// Launch entry: restore a previously chosen indefinite session, otherwise just refresh status.
+    func restoreClosedLidSessionIfNeeded() {
+        guard settingsStore.shouldResumeClosedLidIndefinitely else {
+            refreshStatus()
+            return
+        }
+
+        start(duration: nil, logMode: "launch-restore", source: .launchRestore)
+    }
+
     func enableForOneHour() {
-        start(duration: 3600, logMode: "timed")
+        start(duration: 3600, logMode: "timed", source: .userTimed)
     }
 
     func enableIndefinitely() {
-        start(duration: nil, logMode: "indefinite")
+        start(duration: nil, logMode: "indefinite", source: .userIndefinite)
     }
 
     func stopNow() {
+        clearResumeIntent()
+        suppressResumeIntentWrite = true
         stopActiveSession(reason: "menu", showFailureAlert: true) { _, _ in }
     }
 
@@ -128,6 +151,7 @@ final class ClosedLidKeepAwakeController {
             return
         }
 
+        // Lifecycle stop restores normal sleep but keeps resume intent for the next launch.
         stopActiveSession(reason: reason, showFailureAlert: true, completion: completion)
     }
 
@@ -157,7 +181,7 @@ final class ClosedLidKeepAwakeController {
         }
     }
 
-    private func start(duration: TimeInterval?, logMode: String) {
+    private func start(duration: TimeInterval?, logMode: String, source: StartSource) {
         guard state.canStartSession else {
             logStore.append("closed-lid start ignored state=\(state.logValue)")
             return
@@ -168,6 +192,13 @@ final class ClosedLidKeepAwakeController {
             return
         }
 
+        // Timed enable is a new user choice: drop durable indefinite resume.
+        if source == .userTimed {
+            clearResumeIntent()
+        }
+
+        suppressResumeIntentWrite = false
+        pendingStartSource = source
         approvalFollowUpAttemptsRemaining = approvalFollowUpMaxAttempts
         state = .starting
         approvalAlertShownForCurrentStart = false
@@ -184,13 +215,14 @@ final class ClosedLidKeepAwakeController {
                 ) {
                     return
                 }
-                self.beginApprovalFollowUp(duration: duration)
+                self.beginApprovalFollowUp(duration: duration, source: source)
             case .notFound(let message), .failure(let message):
                 if self.finishDeferredStopWithoutSession(
                     logMessage: "closed-lid helper preparation failed while stop pending: \(message)"
                 ) {
                     return
                 }
+                self.clearPendingStart()
                 self.state = .error(message)
                 self.logStore.append("closed-lid helper preparation failed: \(message)")
             case .unsafeActiveSession(let message):
@@ -200,6 +232,7 @@ final class ClosedLidKeepAwakeController {
                 ) {
                     return
                 }
+                self.clearPendingStart()
                 self.clearActiveSession()
                 self.state = .stopFailed(message)
                 self.logStore.append(
@@ -214,12 +247,14 @@ final class ClosedLidKeepAwakeController {
             guard let self else { return }
             switch result {
             case .started(let session):
+                self.commitResumeIntentIfNeeded(for: session)
                 if self.finishDeferredStopAfterStart(session) {
                     return
                 }
                 self.applyActiveSession(session)
                 self.logStore.append("closed-lid active mode=\(session.logMode)")
             case .alreadyActive(let session):
+                self.commitResumeIntentIfNeeded(for: session)
                 if self.finishDeferredStopAfterStart(session) {
                     return
                 }
@@ -227,6 +262,7 @@ final class ClosedLidKeepAwakeController {
                 self.logStore.append("closed-lid helper already active mode=\(session.logMode)")
             case .failedWithActiveSession(let session, let message):
                 self.logStore.append("closed-lid start failed with active lease: \(message)")
+                self.clearPendingStart()
                 if self.finishDeferredStopAfterStart(session) {
                     return
                 }
@@ -234,6 +270,7 @@ final class ClosedLidKeepAwakeController {
             case .requiresApproval:
                 if self.stopRequestedDuringStart {
                     self.stopRequestedDuringStart = false
+                    self.clearPendingStart()
                     if self.isStopInFlight {
                         self.completeStop(success: true, message: nil)
                     } else {
@@ -242,13 +279,16 @@ final class ClosedLidKeepAwakeController {
                     return
                 }
                 if self.isStopInFlight {
+                    self.clearPendingStart()
                     self.completeStop(success: true, message: nil)
                     return
                 }
-                self.beginApprovalFollowUp(duration: duration)
+                let source = self.pendingStartSource ?? .userTimed
+                self.beginApprovalFollowUp(duration: duration, source: source)
             case .failure(let message):
                 if self.stopRequestedDuringStart {
                     self.stopRequestedDuringStart = false
+                    self.clearPendingStart()
                     if self.isStopInFlight {
                         self.completeStop(success: true, message: nil)
                     } else {
@@ -258,14 +298,46 @@ final class ClosedLidKeepAwakeController {
                     return
                 }
                 if self.isStopInFlight {
+                    self.clearPendingStart()
                     self.completeStop(success: true, message: nil)
                     return
                 }
+                self.clearPendingStart()
                 self.clearActiveSession()
                 self.state = .error(message)
                 self.logStore.append("closed-lid start failed: \(message)")
             }
         }
+    }
+
+    private func clearResumeIntent() {
+        if settingsStore.shouldResumeClosedLidIndefinitely {
+            settingsStore.shouldResumeClosedLidIndefinitely = false
+            logStore.append("closed-lid resume intent cleared")
+        }
+    }
+
+    /// Persist resume intent only for a successful user indefinite start. Launch restore relies on
+    /// the existing setting; timed starts never write true (and clear on entry).
+    private func commitResumeIntentIfNeeded(for session: ClosedLidHelperSession) {
+        defer { clearPendingStart() }
+
+        guard !suppressResumeIntentWrite else {
+            return
+        }
+        guard pendingStartSource == .userIndefinite else {
+            return
+        }
+        guard session.mode == .indefinite else {
+            return
+        }
+
+        settingsStore.shouldResumeClosedLidIndefinitely = true
+        logStore.append("closed-lid resume intent stored")
+    }
+
+    private func clearPendingStart() {
+        pendingStartSource = nil
     }
 
     private var canApplyStatusRefresh: Bool {
@@ -340,11 +412,13 @@ final class ClosedLidKeepAwakeController {
         // 合盖监听的结束同样由 state 的 didSet 统一驱动。
     }
 
-    private func beginApprovalFollowUp(duration: TimeInterval?) {
+    private func beginApprovalFollowUp(duration: TimeInterval?, source: StartSource) {
         cancelApprovalFollowUp(resetBudget: false)
         approvalFollowUpGeneration += 1
         activeApprovalFollowUpGeneration = approvalFollowUpGeneration
         approvalFollowUpDuration = duration
+        approvalFollowUpSource = source
+        pendingStartSource = source
 
         clearActiveSession()
         state = .requiresApproval
@@ -386,7 +460,9 @@ final class ClosedLidKeepAwakeController {
         switch result {
         case .ready:
             let duration = approvalFollowUpDuration
+            let source = approvalFollowUpSource ?? pendingStartSource
             cancelApprovalFollowUp(resetBudget: false)
+            pendingStartSource = source
             state = .starting
             logStore.append("closed-lid helper approval confirmed; starting requested session")
             startPreparedSession(duration: duration)
@@ -394,10 +470,12 @@ final class ClosedLidKeepAwakeController {
             scheduleApprovalFollowUpRetry(generation: generation)
         case .notFound(let message), .failure(let message):
             cancelApprovalFollowUp()
+            clearPendingStart()
             state = .error(message)
             logStore.append("closed-lid helper approval follow-up failed: \(message)")
         case .unsafeActiveSession(let message):
             cancelApprovalFollowUp()
+            clearPendingStart()
             clearActiveSession()
             state = .stopFailed(message)
             logStore.append(
@@ -441,6 +519,8 @@ final class ClosedLidKeepAwakeController {
         }
 
         cancelApprovalFollowUp()
+        // Keep pendingStartSource so resume intent rules stay tied to the original request;
+        // launch restore leaves shouldResume true; user timed already cleared it.
         state = .requiresApproval
         logStore.append("closed-lid helper approval follow-up stopped before approval was confirmed")
     }
@@ -451,6 +531,7 @@ final class ClosedLidKeepAwakeController {
         approvalFollowUpTimeoutTimer?.invalidate()
         approvalFollowUpTimeoutTimer = nil
         approvalFollowUpDuration = nil
+        approvalFollowUpSource = nil
         approvalFollowUpPrepareInFlight = false
         activeApprovalFollowUpGeneration = nil
         if resetBudget {
@@ -592,6 +673,7 @@ final class ClosedLidKeepAwakeController {
         }
 
         stopRequestedDuringStart = false
+        clearPendingStart()
         clearActiveSession()
         logStore.append(logMessage)
 
@@ -609,6 +691,7 @@ final class ClosedLidKeepAwakeController {
         }
 
         stopRequestedDuringStart = false
+        clearPendingStart()
         clearActiveSession()
         logStore.append(logMessage)
 
@@ -658,6 +741,7 @@ final class ClosedLidKeepAwakeController {
         isStopInFlight = true
         activeStopReason = reason
         cancelApprovalFollowUp()
+        clearPendingStart()
         clearActiveSession()
         state = .stopping
         logStore.append("closed-lid pending approval follow-up canceled reason=\(reason)")
