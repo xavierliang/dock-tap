@@ -382,11 +382,16 @@ cd "$ROOT"
 verify_required_arches() {
     local binary="$1"
     local label="$2"
+    local arch
 
-    if ! /usr/bin/lipo "$binary" -verify_arch "${PACKAGE_ARCHS[@]}" >/dev/null 2>&1; then
-        /usr/bin/file "$binary" >&2 || true
-        fail "$label is missing one or more required architectures: ${PACKAGE_ARCHS[*]}"
-    fi
+    # Some lipo versions parse a second -verify_arch argument as another input
+    # file. Check each architecture separately while still requiring all of them.
+    for arch in "${PACKAGE_ARCHS[@]}"; do
+        if ! /usr/bin/lipo "$binary" -verify_arch "$arch" >/dev/null 2>&1; then
+            /usr/bin/file "$binary" >&2 || true
+            fail "$label is missing required architecture: $arch"
+        fi
+    done
 }
 
 create_universal_binary() {
