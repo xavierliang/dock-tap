@@ -201,11 +201,11 @@ Per-call sequence:
 10. **Pick the target display** with `ScreenCoordinateConverter.selectDisplay(for: <current AX rect>, in: <displays>)`. The converter accepts the AX rect and converts it to AppKit internally. Its policy is: maximum frame intersection → containing-center on tie/zero → `isCoordinateAnchor: true` fallback → `nil`. If the converter returns `nil`, `WindowActor` logs `action failed windowAction=<rawValue> no selectable display` and returns. The window stays on its current display — pick-display is "where is this window now," not "where should it go."
 11. Compute the target rect in AppKit coordinates: `let targetAppKit = action.targetRect(in: chosenDisplay.visibleFrame)`. `targetRect` is pure AppKit math and knows nothing about AX or `DisplayFrame`.
 12. **Convert the target rect's origin back to AX coordinates** via `ScreenCoordinateConverter` (size stays unchanged). The result is an AX-coordinate `CGPoint` + an unchanged `CGSize`. If the converter cannot translate (e.g. the `[DisplayFrame]` had no `isCoordinateAnchor: true` entry — a degenerate runtime state), log and return.
-13. Write order — size, then position, then size again. The final size write removes state dependence when the first size write is clamped because the window is still at its old origin (for example, Center → Maximize).
+13. Before writing, read the app's `AXEnhancedUserInterface`. If enabled, temporarily disable it to prevent animated AX writes from interrupting one another. Restore the original enabled state after the writes, including on AX errors; log disable/restore errors. Keep the write order size, position, size so a size clamped at the old origin can be corrected after moving.
 14. `AXUIElementSetAttributeValue(window, kAXSizeAttribute, AXValueCreate(.cgSize, &size))`; check return code.
 15. `AXUIElementSetAttributeValue(window, kAXPositionAttribute, AXValueCreate(.cgPoint, &positionAX))`; check return code.
 16. Repeat the same `kAXSizeAttribute` write after the position write; check return code.
-17. Log `action applied windowAction=<rawValue> ... currentAppKit=<x,y,w,h> display=<chosen> rectAppKit=<x,y,w,h> originAX=<x,y> axInitialSizeResult=<code> axPositionResult=<code> axFinalSizeResult=<code>` when the position write and final size write both succeed; log `action partial ...` when at least one write succeeds but the final position/size pair is incomplete; log `action failed ...` when all three writes fail. Logging both rect spaces and the chosen display makes coordinate-bug forensics direct.
+17. Log each attempt as `action requested`, including app, target frame, AX write results, and Enhanced UI disable/restore results. After 150 ms, read back the actual frame and log `action applied` only if it matches within one point. Retry a mismatch at most twice against the original window and target; after that log `action partial` with `verification=frameMismatch` and the actual frame. Unreadable frames log `action unverified` and stop. Invalidate pending verification/retries on every new snap, even if the new snap cannot run. Before each attempt and verification, check the focused app/window, fullscreen/minimized state, display geometry, and pressed mouse buttons; stop with `action cancelled` if the captured target is no longer safe to adjust. `WindowFrameAdjusterTests` exercise animated/delayed writes, silent failures, constrained windows, restoration, and cancellation with a controlled scheduler.
 
 Failure modes and how `WindowActor` handles each:
 - **No frontmost app** (rare; happens momentarily during app launch/quit): log + no-op. No alert, no error sound.
@@ -222,7 +222,7 @@ The actor must **not**:
 - Activate the app it is snapping (no `NSRunningApplication.activate` here — snapping is intentional, activating is the user's `AppActivator` job).
 - Iterate or enumerate windows beyond the focused one.
 - Walk Spaces or move windows across Spaces.
-- Read or write any AX attribute other than the named surface above (`kAXFocusedWindow`, `kAXPosition`, `kAXSize`, `kAXFullscreen` / `AXFullScreen`, `kAXMinimizedAttribute` / `AXMinimized`).
+- Read or write any AX attribute other than the named surface above (`kAXFocusedWindow`, `kAXPosition`, `kAXSize`, `kAXFullscreen` / `AXFullScreen`, `kAXMinimizedAttribute` / `AXMinimized`, and app-level `AXEnhancedUserInterface`).
 
 ## Testing plan
 

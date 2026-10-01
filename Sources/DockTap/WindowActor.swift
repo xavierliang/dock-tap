@@ -56,8 +56,10 @@ enum DisplayFrameMapper {
 final class WindowActor {
     private static let fullScreenAttribute = "AXFullScreen"
     private static let minimizedAttribute = kAXMinimizedAttribute
+    private static let enhancedUIAttribute = "AXEnhancedUserInterface"
 
     private let logStore: LogStore
+    private let frameAdjuster = WindowFrameAdjuster()
 
     init(logStore: LogStore) {
         self.logStore = logStore
@@ -74,6 +76,8 @@ final class WindowActor {
     }
 
     private func perform(_ action: WindowAction) {
+        // Invalidate earlier checks even when this new action cannot be executed.
+        frameAdjuster.cancel()
         logStore.append("action start windowAction=\(action.rawValue)")
 
         guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
@@ -131,18 +135,52 @@ final class WindowActor {
             return
         }
 
-        let axInitialSizeResult = setSize(targetAppKitRect.size, on: window)
-        let axPositionResult = setPosition(targetAXOrigin, on: window)
-        // Re-apply size after moving; the first write can be clamped at the old origin.
-        let axFinalSizeResult = setSize(targetAppKitRect.size, on: window)
-        let resultVerb = resultVerb(
-            initialSizeResult: axInitialSizeResult,
-            positionResult: axPositionResult,
-            finalSizeResult: axFinalSizeResult
+        let targetAXRect = CGRect(origin: targetAXOrigin, size: targetAppKitRect.size)
+        let context = "windowAction=\(action.rawValue) app=\(frontmostApp.bundleIdentifier ?? "unknown") currentAppKit=\(format(currentAppKitRect)) display=\(format(display)) rectAppKit=\(format(targetAppKitRect)) targetAX=\(format(targetAXRect))"
+        let access = WindowFrameAdjuster.Access(
+            canAdjust: { [self] in
+                guard NSWorkspace.shared.frontmostApplication?.processIdentifier == frontmostApp.processIdentifier,
+                      NSEvent.pressedMouseButtons == 0,
+                      let focused = focusedWindow(in: appElement).window,
+                      CFEqual(focused, window),
+                      readBoolAttribute(Self.fullScreenAttribute, from: window).value != true,
+                      readBoolAttribute(Self.minimizedAttribute, from: window).value != true else {
+                    return false
+                }
+                // A display/usable-area change invalidates the captured destination.
+                return displayFrames() == displays
+            },
+            readFrame: { [self] in
+                guard let origin = readPointAttribute(kAXPositionAttribute, from: window).point,
+                      let size = readSizeAttribute(kAXSizeAttribute, from: window).size else { return nil }
+                return CGRect(origin: origin, size: size)
+            },
+            readEnhancedUI: { [self] in
+                readBoolAttribute(Self.enhancedUIAttribute, from: appElement).value
+            },
+            setEnhancedUI: { enabled in
+                AXUIElementSetAttributeValue(appElement, Self.enhancedUIAttribute as CFString,
+                                             enabled ? kCFBooleanTrue : kCFBooleanFalse)
+            },
+            setSize: { [self] in setSize($0, on: window) },
+            setPosition: { [self] in setPosition($0, on: window) }
         )
-        logStore.append(
-            "\(resultVerb) windowAction=\(action.rawValue) currentAppKit=\(format(currentAppKitRect)) display=\(format(display)) rectAppKit=\(format(targetAppKitRect)) originAX=\(format(targetAXOrigin)) axInitialSizeResult=\(axInitialSizeResult.rawValue) axPositionResult=\(axPositionResult.rawValue) axFinalSizeResult=\(axFinalSizeResult.rawValue)"
-        )
+        frameAdjuster.apply(target: targetAXRect, access: access, onAttempt: { [self] attempt, writes in
+            logStore.append(
+                "action requested \(context) attempt=\(attempt) axInitialSizeResult=\(writes.initialSize.rawValue) axPositionResult=\(writes.position.rawValue) axFinalSizeResult=\(writes.finalSize.rawValue) enhancedUI=\(writes.enhancedUIWasEnabled.map(String.init) ?? "unknown") axDisableEnhancedUI=\(writes.disableEnhancedUI.map { String($0.rawValue) } ?? "not-needed") axRestoreEnhancedUI=\(writes.restoreEnhancedUI.map { String($0.rawValue) } ?? "not-needed")"
+            )
+        }, completion: { [self] result in
+            let status: String
+            switch result.outcome {
+            case .verified: status = "applied"
+            case .frameMismatch: status = "partial"
+            case .frameUnavailable: status = "unverified"
+            case .cancelled: status = "cancelled"
+            }
+            logStore.append(
+                "action \(status) \(context) attempts=\(result.attempts) verification=\(result.outcome) actualAX=\(result.actualFrame.map { format($0) } ?? "unavailable")"
+            )
+        })
     }
 
     private func displayFrames() -> [DisplayFrame] {
@@ -221,7 +259,7 @@ final class WindowActor {
         guard error == .success else {
             return (nil, error)
         }
-        guard CFGetTypeID(value) == AXValueGetTypeID() else {
+        guard let value, CFGetTypeID(value) == AXValueGetTypeID() else {
             return nil
         }
         let axValue = value as! AXValue
@@ -255,31 +293,12 @@ final class WindowActor {
         }
     }
 
-    private func resultVerb(
-        initialSizeResult: AXError,
-        positionResult: AXError,
-        finalSizeResult: AXError
-    ) -> String {
-        switch (initialSizeResult == .success, positionResult == .success, finalSizeResult == .success) {
-        case (_, true, true):
-            "action applied"
-        case (false, false, false):
-            "action failed"
-        default:
-            "action partial"
-        }
-    }
-
     private func format(_ display: DisplayFrame) -> String {
         "{id=\(display.identifier ?? "unknown"),frame=\(format(display.frame)),visibleFrame=\(format(display.visibleFrame)),coordinateAnchor=\(display.isCoordinateAnchor)}"
     }
 
     private func format(_ rect: CGRect) -> String {
         "{\(format(rect.origin.x)),\(format(rect.origin.y)),\(format(rect.size.width)),\(format(rect.size.height))}"
-    }
-
-    private func format(_ point: CGPoint) -> String {
-        "{\(format(point.x)),\(format(point.y))}"
     }
 
     private func format(_ value: CGFloat) -> String {

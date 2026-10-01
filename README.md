@@ -65,6 +65,8 @@ Window Snap is off by default. Choose `Enable Window Snap` from the menu to let 
 
 The `Window Snap Bindings` submenu shows the exact bindings for the current shortcut modifier. Window Snap uses the focused window on its current display and does not cycle sizes or move windows between displays.
 
+Window Snap temporarily suspends an app's Enhanced UI mode during resizing and restores its previous state afterward. It checks the actual window frame after a short settling interval and retries up to twice if necessary. A new snap replaces any pending correction; corrections stop if focus or display geometry changes, the window becomes minimized/fullscreen, or a mouse button is held. Apps that enforce their own size limits may still prevent an exact fit; the log reports the actual frame instead of claiming success.
+
 When enabled, Window Snap uses the existing Accessibility trust to write other apps' window position and size, broadening Dock Tap's trust surface beyond app activation.
 
 When Window Snap is enabled, Dock Tap consumes those chords before the focused app or macOS global shortcut handlers see them. This affects editor and text-field shortcuts such as `Option+←` / `Option+→` word jumps or `Command+←` / `Command+→` line/document jumps when that same preset is selected. It also affects system shortcuts such as `Command+Space` for Spotlight if your shortcut modifier is Command, and `Control+Space` for input-source switching if your shortcut modifier is Control.
