@@ -7,9 +7,16 @@ final class SettingsStore {
         static let windowActionsEnabled = "windowActionsEnabled"
         static let hasSeenClosedLidWarning = "hasSeenClosedLidWarning"
         static let shouldResumeClosedLidIndefinitely = "shouldResumeClosedLidIndefinitely"
+        static let keepDisplayAwakeDuringSession = "keepDisplayAwakeDuringSession"
     }
 
     private let defaults: UserDefaults
+
+    /// Opt-in display idle-sleep prevention, scoped to a keep-awake session.
+    var keepDisplayAwakeDuringSession: Bool {
+        get { defaults.bool(forKey: Keys.keepDisplayAwakeDuringSession) }
+        set { defaults.set(newValue, forKey: Keys.keepDisplayAwakeDuringSession) }
+    }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults

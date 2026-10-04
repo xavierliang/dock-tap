@@ -9,6 +9,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let dockSlotStore = DockSlotStore()
     private lazy var appActivator = AppActivator(logStore: logStore)
     private lazy var windowActor = WindowActor(logStore: logStore)
+    private lazy var displayKeepAwakeController = DisplayKeepAwakeController(
+        settingsStore: settingsStore, logStore: logStore)
     private lazy var closedLidController: ClosedLidKeepAwakeController = {
         let controller = ClosedLidKeepAwakeController(
             settingsStore: settingsStore,
@@ -16,7 +18,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             logStore: logStore
         )
         controller.onStateChanged = { [weak self] in
-            self?.rebuildMenu()
+            guard let self else { return }
+            self.displayKeepAwakeController.updateSessionState(self.closedLidController.state)
+            self.rebuildMenu()
         }
         return controller
     }()
@@ -86,6 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         healthReconcileTimer?.invalidate()
         closedLidController.invalidate()
+        displayKeepAwakeController.invalidate()
         activeAppProvider.stop()
         eventTapController?.stop()
     }
@@ -141,6 +146,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func stopClosedLidNow() {
         closedLidController.stopNow()
+    }
+
+    @objc private func toggleDisplayKeepAwake() {
+        displayKeepAwakeController.setEnabled(!displayKeepAwakeController.isEnabled)
+        rebuildMenu()
     }
 
     @objc private func openClosedLidApprovalSettings() {
@@ -202,6 +212,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         closedLidController.refreshStatus()
+        displayKeepAwakeController.reconcile()
         refreshDock(reason: "menu")
     }
 
@@ -383,6 +394,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         for item in closedLidMenuItems(menuModel) {
             statusMenu.addItem(item)
+        }
+        let displayKeepAwakeItem = commandItem(
+            title: AppText.DisplayKeepAwake.toggle,
+            action: #selector(toggleDisplayKeepAwake),
+            keyEquivalent: ""
+        )
+        displayKeepAwakeItem.state = displayKeepAwakeController.isEnabled ? .on : .off
+        displayKeepAwakeItem.toolTip = AppText.DisplayKeepAwake.tooltip
+        statusMenu.addItem(displayKeepAwakeItem)
+        if let error = displayKeepAwakeController.errorMessage {
+            statusMenu.addItem(disabledItem(error))
         }
         statusMenu.addItem(.separator())
 

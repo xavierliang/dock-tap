@@ -1,3 +1,9 @@
+/* Display keep awake */
+"displayKeepAwake.toggle" = "会话期间保持屏幕唤醒";
+"displayKeepAwake.tooltip" = "保持唤醒会话期间，阻止显示器因闲置而休眠，无需输入密码。不会解锁 Mac 或更改密码要求；合盖或系统策略仍可能触发锁屏。";
+"displayKeepAwake.startFailed" = "无法保持屏幕唤醒，请重新打开菜单重试。";
+"displayKeepAwake.stopFailed" = "无法释放屏幕保活，请重新打开菜单重试。";
+
 /* Status line */
 "status.ready" = "准备就绪";
 "status.starting" = "正在启动";

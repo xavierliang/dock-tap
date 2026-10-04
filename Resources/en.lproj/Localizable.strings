@@ -1,3 +1,9 @@
+/* Display keep awake */
+"displayKeepAwake.toggle" = "Keep Display Awake During Session";
+"displayKeepAwake.tooltip" = "Prevents idle display sleep during a keep-awake session. No password is needed. Does not unlock the Mac or change its password requirement; lid-close and policy-driven locking may still occur.";
+"displayKeepAwake.startFailed" = "Could not keep the display awake; reopen the menu to retry.";
+"displayKeepAwake.stopFailed" = "Could not release display keep-awake; reopen the menu to retry.";
+
 /* Status line */
 "status.ready" = "Ready";
 "status.starting" = "Starting";

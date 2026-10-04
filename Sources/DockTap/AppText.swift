@@ -1,6 +1,21 @@
 import Foundation
 
 enum AppText {
+    enum DisplayKeepAwake {
+        static let toggle = NSLocalizedString(
+            "displayKeepAwake.toggle", value: "Keep Display Awake During Session", comment: "Menu toggle")
+        static let tooltip = NSLocalizedString(
+            "displayKeepAwake.tooltip",
+            value: "Prevents idle display sleep during a keep-awake session. No password is needed. Does not unlock the Mac or change its password requirement; lid-close and policy-driven locking may still occur.",
+            comment: "Display keep-awake scope")
+        static let startFailed = NSLocalizedString(
+            "displayKeepAwake.startFailed", value: "Could not keep the display awake; reopen the menu to retry.",
+            comment: "Display assertion failure")
+        static let stopFailed = NSLocalizedString(
+            "displayKeepAwake.stopFailed", value: "Could not release display keep-awake; reopen the menu to retry.",
+            comment: "Display assertion release failure")
+    }
+
     enum Status {
         static let ready = NSLocalizedString(
             "status.ready", value: "Ready", comment: "Status line: event tap is ready")

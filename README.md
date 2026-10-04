@@ -95,6 +95,27 @@ Dock Tap blocks normal quit and Sparkle update installation until the helper con
 sudo pmset -a disablesleep 0
 ```
 
+## Keep Display Awake During Session
+
+The opt-in `Keep Display Awake During Session` toggle sits beside the keep-awake
+controls. During a timed or indefinite session, Dock Tap holds the public IOKit
+`PreventUserIdleDisplaySleep` assertion to prevent the display from sleeping due
+to inactivity. This option requires no password or additional administrator access.
+It does not modify the screen-lock password requirement, store credentials, or
+simulate mouse/keyboard input.
+
+Turning the option off or ending the session releases the assertion. Normal quit
+also releases it, and macOS removes the process-owned assertion if the app crashes
+or is force quit. The checkbox preference is remembered for subsequent sessions;
+when no keep-awake session is active, the checkbox alone holds no assertion.
+
+This is display idle-sleep prevention, not a promise to prevent every automatic
+lock. It does not unlock an already locked session. Closing the lid, manual locking,
+and device-management policies may still affect the desktop. Its effect on idle
+screen savers / auto-lock, and continued screenshot/input availability with the
+lid closed, must be verified on the target Mac. The existing closed-lid helper
+and brightness behavior remain responsible for their respective functions.
+
 ## Launch at Login
 
 Dock Tap uses `SMAppService.mainApp` for Launch at Login. macOS registers the currently running packaged app path. For daily use, keep that path stable before enabling Launch at Login. To use `/Applications`, first copy the built app to `/Applications/DockTap.app`, launch `/Applications/DockTap.app`, then enable Launch at Login from that running copy. Do not enable Launch at Login from `build/DockTap.app` and move the app afterward.
