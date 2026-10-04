@@ -1,131 +1,103 @@
-# Dock Tap
+<p align="center">
+  <img src="Resources/DockTap.iconset/icon_256x256.png" width="112" height="112" alt="Dock Tap app icon">
+</p>
 
-Dock Tap is a macOS 13+ menu bar app that maps one physical modifier preset plus `1` through `0` to the first ten Dock apps. The same preset plus backtick activates Finder.
+<h1 align="center">Dock Tap</h1>
 
-## Install
+<p align="center">
+  <strong>Keep your Mac awake. Let your agents work.</strong><br>
+  Keep work running with the lid closed, and your everyday apps a shortcut away.
+</p>
 
-Download the latest notarized `DockTap-<version>-universal.dmg` from GitHub Releases, open it, and drag `DockTap.app` to `/Applications`. Keeping Dock Tap in `/Applications` is also the supported path for the privileged Closed-Lid helper.
+<p align="center">
+  <a href="https://github.com/xavierliang/dock-tap/releases/latest"><strong>Download for macOS</strong></a>
+  · <a href="#get-started">Get started</a>
+  · <a href="docs/usage.md">User guide</a>
+</p>
 
-On first launch, grant Dock Tap Accessibility access in System Settings. Dock Tap uses that permission to activate Dock apps and, when enabled, resize the focused window.
+<p align="center">
+  macOS 13+ · Apple silicon &amp; Intel · English &amp; 简体中文 · <a href="LICENSE">MIT license</a>
+</p>
 
-## Usage
+Agent tasks can take longer than you want to sit at your Mac. Dock Tap keeps your Mac awake — even with the lid closed — so system sleep doesn't interrupt agents, builds, or scripts running on your machine. Start a session, let your agent work, and come back when you're ready.
 
-Launch Dock Tap from `/Applications`. Choose `Shortcut Modifier` from the menu bar item, then hold that physical modifier and press `1` through `0` to activate the matching Dock app. Press the same modifier plus backtick to activate Finder.
+- **Keep your Mac awake for agent work.** Choose a one-hour session or indefinite mode for tasks with no clear finish time. Optionally prevent display idle sleep during the session, too.
+- **Use the Dock you already know.** Shortcuts follow your pinned apps. Reorder your Dock, then open the Dock Tap menu to pick up the new order.
+- **Choose your modifier.** Five physical key presets, including separate left and right Option and Command keys.
+- **Arrange windows with the same modifier.** Snap to halves, maximize, or center the focused window.
 
-Use the menu to enable or disable Dock Shortcuts and Window Snap, refresh Dock shortcuts, control Closed-Lid Keep Awake, and configure Launch at Login.
+Dock Tap lives in the menu bar, with Launch at Login and built-in update checks.
 
-Use `Check for Updates…` to open the Sparkle updater. Dock Tap also lets Sparkle handle scheduled background update prompts when a signed update is available.
+## Get started
 
-## Build and Run
+1. [Download the latest release](https://github.com/xavierliang/dock-tap/releases/latest) and open `DockTap-<version>-universal.dmg`. Release builds are signed and notarized.
+2. Drag **DockTap.app** to **Applications** and launch it from there.
+3. Grant **Accessibility** access when prompted. Dock Tap uses it for app shortcuts and optional window resizing.
+4. Under **Closed-Lid Keep Awake**, choose **Enable for 1 Hour** or **Enable Indefinitely**. Approve the helper if prompted, and wait for the menu to show an active session before closing the lid.
 
-Use a stable Apple Development signing identity for Accessibility/TCC validation:
+To try app switching, hold **Left Option** and press **1** to open your first pinned Dock app. Open **Dock Shortcut Bindings** to see all your mappings. You can also enable **Launch at Login** from the menu.
+
+## Keep Awake for agent work
+
+Give a coding agent time to work through a task, leave a build running, or let a script finish while you step away. **Keep Awake** prevents system sleep during your session, including when you close the lid. Leave Dock Tap running while the task runs.
+
+Use the **Closed-Lid Keep Awake** controls in the menu, or these shortcuts with the default **Left Option** modifier:
+
+| Hold Left Option, then press… | Action |
+| --- | --- |
+| <kbd>A</kbd> | Enable for 1 hour |
+| <kbd>S</kbd> | Enable indefinitely |
+| <kbd>D</kbd> | Stop now |
+
+Choose one hour for a timed session, or indefinite mode when you don't know how long the task will take. Indefinite mode is remembered for the next launch. Normal quit stops the current session; **Stop Now** also clears the saved choice.
+
+Enable **Keep Display Awake During Session** to prevent idle display sleep during an active session. It does not unlock your Mac or change its password requirements; agents that need an unlocked desktop can still be affected by screen locking. [Display and locking behavior →](docs/usage.md#keep-display-awake-during-session)
+
+Closed-lid mode requires a privileged helper and may need approval in System Settings. It can increase battery drain and heat; use it on a ventilated surface. [Setup, session behavior, and recovery →](docs/usage.md#closed-lid-keep-awake)
+
+## Your Dock, one shortcut away
+
+Your favorite apps already have a place in the Dock. Dock Tap gives them a shortcut, too: hold **Left Option** and press **1–9 or 0** to open a pinned app or bring it to the front. The order in your Dock becomes the order on your keyboard.
+
+![Example Dock order: Left Option plus backtick opens Finder; Left Option plus 1, 2, 3, through 0 opens the first through tenth pinned app.](docs/images/dock-shortcuts.svg)
+
+All examples use the default **Left Option** key. Change it under **Shortcut Modifier** to Left Command, Left Control, Right Option, or Right Command; the same choice applies across all shortcuts.
+
+| Hold Left Option, then press… | Action |
+| --- | --- |
+| <kbd>1</kbd> … <kbd>9</kbd> | Open or switch to pinned Dock apps 1–9 |
+| <kbd>0</kbd> | Open or switch to the 10th pinned app |
+| <kbd>`</kbd> | Switch to Finder |
+
+Finder is separate from the numbered apps. Recent apps, folders, and Dock spacers do not take numbered slots. Dock Tap reads your Dock order at launch and whenever you open its menu.
+
+### Put windows in place
+
+Turn on **Enable Window Snap** in the menu to use these shortcuts. It is off by default.
+
+| Hold Left Option, then press… | Action |
+| --- | --- |
+| <kbd>←</kbd> / <kbd>→</kbd> | Left / right half |
+| <kbd>↑</kbd> / <kbd>↓</kbd> | Top / bottom half |
+| <kbd>Return</kbd> | Maximize |
+| <kbd>Space</kbd> | Center at 75% of the display's usable width and height |
+
+Actions apply to the focused window on its current display. These shortcuts take over matching app or system shortcuts while Window Snap is enabled, including Option + arrow text navigation. Choose another modifier or toggle Window Snap off when needed. [More about window behavior and shortcut conflicts →](docs/usage.md#window-snap)
+
+## Help and details
+
+See the [user guide](docs/usage.md) for permissions, shortcut behavior, login settings, and troubleshooting. If something is not working, choose **Show Logs** from the menu and [open an issue](https://github.com/xavierliang/dock-tap/issues).
+
+## Build from source
+
+Requires macOS 13+ and a Swift 5.9+ toolchain. From the repository root, build and launch with a stable Apple Development signing identity:
 
 ```sh
 DOCK_TAP_CODESIGN_IDENTITY="Apple Development: Your Name (TEAMID)" scripts/run-app.sh
 ```
 
-The packaged app is written to `build/DockTap.app` with bundle id `ai.resopod.docktap`. Ad-hoc signing is available only for launch smoke tests via `DOCK_TAP_ALLOW_UNSTABLE_ADHOC=1`; it is not stable for Accessibility validation.
-
-## Accessibility
-
-Dock Tap needs Accessibility access for the packaged, signed `DockTap.app`. Because the bundle id is `ai.resopod.docktap`, macOS treats it as a separate TCC entry from older development builds such as `dev.local.DockTap`.
-
-If the menu shows Accessibility as missing, choose `Check Accessibility` to prompt again or `Open Accessibility Settings` and enable the signed app entry manually.
-
-## Menu
-
-The main menu starts with current readiness, followed by `Shortcut Modifier`. `Enable Dock Shortcuts` toggles Dock app and Finder shortcuts. `Dock Shortcut Bindings` shows the Finder shortcut plus the full ten-slot Dock list.
-
-Dock shortcuts update automatically on launch and each time the main menu opens. Use `Refresh Dock Shortcuts` as a manual fallback after changing Dock contents.
-
-## Shortcut Modifier
-
-The shortcut modifier is fixed to one of five physical presets:
-
-- Left Option (default)
-- Left Command
-- Left Control
-- Right Option
-- Right Command
-
-Only the selected physical key may be down. The opposite side or another Option, Command, or Control key rejects the shortcut; any Shift key also rejects it. Caps Lock and Fn do not reject shortcuts.
-
-## Window Snap
-
-Window Snap is off by default. Choose `Enable Window Snap` from the menu to let the same shortcut modifier resize the focused window:
-
-| Shortcut | Action |
-| --- | --- |
-| `<preset>+←` | Left Half |
-| `<preset>+→` | Right Half |
-| `<preset>+↑` | Top Half |
-| `<preset>+↓` | Bottom Half |
-| `<preset>+Return` | Maximize |
-| `<preset>+Space` | Center at 75% width and 75% height |
-
-The `Window Snap Bindings` submenu shows the exact bindings for the current shortcut modifier. Window Snap uses the focused window on its current display and does not cycle sizes or move windows between displays.
-
-Window Snap temporarily suspends an app's Enhanced UI mode during resizing and restores its previous state afterward. It checks the actual window frame after a short settling interval and retries up to twice if necessary. A new snap replaces any pending correction; corrections stop if focus or display geometry changes, the window becomes minimized/fullscreen, or a mouse button is held. Apps that enforce their own size limits may still prevent an exact fit; the log reports the actual frame instead of claiming success.
-
-When enabled, Window Snap uses the existing Accessibility trust to write other apps' window position and size, broadening Dock Tap's trust surface beyond app activation.
-
-When Window Snap is enabled, Dock Tap consumes those chords before the focused app or macOS global shortcut handlers see them. This affects editor and text-field shortcuts such as `Option+←` / `Option+→` word jumps or `Command+←` / `Command+→` line/document jumps when that same preset is selected. It also affects system shortcuts such as `Command+Space` for Spotlight if your shortcut modifier is Command, and `Control+Space` for input-source switching if your shortcut modifier is Control.
-
-Use the menu toggle as the quick escape hatch, or choose a shortcut modifier that does not overlap the shortcuts you rely on. If you want cycling, thirds, sixths, layouts, drag snapping, or cross-display window movement, Rectangle is the better tool for that full window-management suite.
-
-## Closed-Lid Keep Awake
-
-The `Closed-Lid Keep Awake` submenu can keep the Mac awake with the lid closed by using the privileged helper to run the fixed system power setting `pmset -a disablesleep 1`.
-
-Menu commands:
-
-- `Enable for 1 Hour` starts a timed session. The helper owns the one-hour expiry and restores normal lid sleep when it ends. Choosing this also clears any saved “resume indefinitely” intent.
-- `Enable Indefinitely` starts a session with no wall-clock expiry, but Dock Tap must keep renewing its helper lease. If Dock Tap quits, crashes, or stops renewing, the helper restores normal lid sleep while the app is not running. Dock Tap remembers this choice and restores indefinite mode the next time it launches (including after a Mac restart if Launch at Login is on).
-- `Stop Now` restores normal lid sleep immediately by running `pmset -a disablesleep 0`, and clears the saved resume intent so the next launch stays off.
-
-The first enable shows a warning because this changes normal lid-sleep behavior and can increase battery drain and heat. Use it only on a ventilated surface. After you continue once, Dock Tap remembers the acknowledgement.
-
-The helper is registered lazily on first use, not at app launch. macOS may require approval in System Settings > General > Login Items & Extensions; when approval is pending, the submenu shows `Helper approval required` and offers `Open Login Items Settings...`.
-
-While a closed-lid session is active, both enable commands are disabled. To switch between timed and indefinite modes, choose `Stop Now` first. Timed sessions are never restored on launch; only a previous `Enable Indefinitely` choice is.
-
-Dock Tap blocks normal quit and Sparkle update installation until the helper confirms `pmset -a disablesleep 0`. If that confirmation fails, Dock Tap stays open and shows the manual recovery command:
-
-```sh
-sudo pmset -a disablesleep 0
-```
-
-## Keep Display Awake During Session
-
-The opt-in `Keep Display Awake During Session` toggle sits beside the keep-awake
-controls. During a timed or indefinite session, Dock Tap holds the public IOKit
-`PreventUserIdleDisplaySleep` assertion to prevent the display from sleeping due
-to inactivity. This option requires no password or additional administrator access.
-It does not modify the screen-lock password requirement, store credentials, or
-simulate mouse/keyboard input.
-
-Turning the option off or ending the session releases the assertion. Normal quit
-also releases it, and macOS removes the process-owned assertion if the app crashes
-or is force quit. The checkbox preference is remembered for subsequent sessions;
-when no keep-awake session is active, the checkbox alone holds no assertion.
-
-This is display idle-sleep prevention, not a promise to prevent every automatic
-lock. It does not unlock an already locked session. Closing the lid, manual locking,
-and device-management policies may still affect the desktop. Its effect on idle
-screen savers / auto-lock, and continued screenshot/input availability with the
-lid closed, must be verified on the target Mac. The existing closed-lid helper
-and brightness behavior remain responsible for their respective functions.
-
-## Launch at Login
-
-Dock Tap uses `SMAppService.mainApp` for Launch at Login. macOS registers the currently running packaged app path. For daily use, keep that path stable before enabling Launch at Login. To use `/Applications`, first copy the built app to `/Applications/DockTap.app`, launch `/Applications/DockTap.app`, then enable Launch at Login from that running copy. Do not enable Launch at Login from `build/DockTap.app` and move the app afterward.
-
-The menu reads Launch at Login state from `SMAppService.mainApp.status`. If macOS reports approval required, approve Dock Tap in System Settings > General > Login Items. If register or unregister fails, the menu remains based on the actual service status rather than the requested action.
-
-## Known Limits
-
-Dock Tap requires macOS 13 or newer and ships as a Universal app for Apple silicon and Intel Macs. It reads Dock preferences on launch/menu open and treats Dock slots as read-only; it does not mutate Dock contents, remap slots, or support a custom shortcut modifier. Window Snap covers only the listed fixed actions and is not a Rectangle replacement. Closed-Lid Keep Awake intentionally does not monitor battery level or thermals. Sparkle updates download the full DMG because delta updates are not currently published.
+This creates and launches `build/DockTap.app`. A stable signing identity keeps Accessibility authorization consistent across rebuilds. [Development signing details →](docs/usage.md#build-and-run)
 
 ## License
 
-Dock Tap is released under the MIT License. See [LICENSE](LICENSE).
+[MIT](LICENSE) — free to use, modify, and share.

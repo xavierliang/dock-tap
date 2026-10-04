@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="340" viewBox="0 0 1120 340" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Your Dock order becomes your shortcuts</title>
+  <desc id="desc">Illustrated example: hold Left Option and press backtick for Finder, 1 for Browser, 2 for Editor, 3 for Terminal, and 0 for the tenth pinned app.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1120" y2="340" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F6F9F0"/>
+      <stop offset="1" stop-color="#F0F4F7"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="286" y1="88" x2="354" y2="156" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#95CA4A"/>
+      <stop offset="1" stop-color="#689E29"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="1118" height="338" rx="24" fill="url(#background)" stroke="#DBE2D5"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="40" y="42" fill="#526048" font-size="13" font-weight="700" letter-spacing="1.6">EXAMPLE DOCK ORDER</text>
+    <text x="1080" y="42" text-anchor="end" fill="#526048" font-size="15">Hold Left Option, then pick an app.</text>
+
+    <rect x="48" y="72" width="1024" height="128" rx="22" fill="#FFFFFF" fill-opacity="0.78" stroke="#E0E6DB"/>
+    <path d="M222 92V180" stroke="#DCE3D6"/>
+
+    <rect x="98" y="88" width="68" height="68" rx="17" fill="#E1EDF7"/>
+    <path d="M114 108H150M114 118H144M114 128H139" stroke="#4B7291" stroke-width="3" stroke-linecap="round"/>
+    <text x="132" y="184" text-anchor="middle" fill="#33402D" font-size="16" font-weight="600">Finder</text>
+
+    <rect x="286" y="88" width="68" height="68" rx="17" fill="url(#accent)"/>
+    <circle cx="320" cy="122" r="20" stroke="#FFFFFF" stroke-width="2.5"/>
+    <ellipse cx="320" cy="122" rx="9" ry="20" stroke="#FFFFFF" stroke-width="2"/>
+    <path d="M301 116H339M301 128H339" stroke="#FFFFFF" stroke-width="2"/>
+    <text x="320" y="184" text-anchor="middle" fill="#33402D" font-size="16" font-weight="600">Browser</text>
+
+    <rect x="474" y="88" width="68" height="68" rx="17" fill="#E9E6F5"/>
+    <path d="M499 110L487 122L499 134M517 110L529 122L517 134M512 104L504 140" stroke="#7563A5" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="508" y="184" text-anchor="middle" fill="#33402D" font-size="16" font-weight="600">Editor</text>
+
+    <rect x="662" y="88" width="68" height="68" rx="17" fill="#2D343B"/>
+    <path d="M678 110L690 121L678 132M698 133H714" stroke="#C8EC99" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="696" y="184" text-anchor="middle" fill="#33402D" font-size="16" font-weight="600">Terminal</text>
+
+    <g fill="#94A18C">
+      <circle cx="824" cy="124" r="3"/>
+      <circle cx="838" cy="124" r="3"/>
+      <circle cx="852" cy="124" r="3"/>
+    </g>
+
+    <rect x="942" y="88" width="68" height="68" rx="17" fill="#E6EBE2"/>
+    <g fill="#819373">
+      <rect x="959" y="105" width="13" height="13" rx="3"/>
+      <rect x="980" y="105" width="13" height="13" rx="3"/>
+      <rect x="959" y="126" width="13" height="13" rx="3"/>
+      <rect x="980" y="126" width="13" height="13" rx="3"/>
+    </g>
+    <text x="976" y="184" text-anchor="middle" fill="#33402D" font-size="16" font-weight="600">10th app</text>
+
+    <g stroke="#C4CDBD" stroke-width="1.5">
+      <path d="M132 201V218M320 201V218M508 201V218M696 201V218M976 201V218"/>
+    </g>
+    <g fill="#FFFFFF" stroke="#CCD6C3">
+      <rect x="98" y="221" width="68" height="42" rx="10"/>
+      <rect x="286" y="221" width="68" height="42" rx="10" fill="#E6F2D5" stroke="#9DBB78"/>
+      <rect x="474" y="221" width="68" height="42" rx="10"/>
+      <rect x="662" y="221" width="68" height="42" rx="10"/>
+      <rect x="942" y="221" width="68" height="42" rx="10"/>
+    </g>
+    <g fill="#33402D" font-size="22" font-weight="600" text-anchor="middle">
+      <text x="132" y="250">`</text>
+      <text x="320" y="250">1</text>
+      <text x="508" y="250">2</text>
+      <text x="696" y="250">3</text>
+      <text x="976" y="250">0</text>
+    </g>
+    <text x="560" y="308" text-anchor="middle" fill="#526048" font-size="16">Launch an app, or bring it to the front if it's already running.</text>
+  </g>
+</svg>
