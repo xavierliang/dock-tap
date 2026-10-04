@@ -209,6 +209,68 @@ final class ClosedLidHelperClientTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: "closedLidHelperRegisteredGeneration"), "old-generation")
     }
 
+    func testReregisterWaitsForOldServiceToFinishUnregistering() {
+        defaults.set("old-generation", forKey: "closedLidHelperRegisteredGeneration")
+        let unregisterStarted = expectation(description: "old helper begins unregistering")
+        let prepared = expectation(description: "new helper is ready")
+        var finishUnregistering: ((Error?) -> Void)?
+        service.unregisterHandler = { completion in
+            finishUnregistering = completion
+            unregisterStarted.fulfill()
+        }
+        client.prepareForUse { result in
+            XCTAssertEqual(result, .ready)
+            prepared.fulfill()
+        }
+
+        wait(for: [unregisterStarted], timeout: 2)
+        XCTAssertEqual(service.registerCallCount, 0)
+        XCTAssertEqual(defaults.string(forKey: "closedLidHelperRegisteredGeneration"), "old-generation")
+
+        reregistrationEvents.append("unregisterCompleted")
+        finishUnregistering?(nil)
+        wait(for: [prepared], timeout: 2)
+
+        XCTAssertEqual(reregistrationEvents, ["status", "unregister", "unregisterCompleted", "register"])
+        XCTAssertEqual(service.registerCallCount, 1)
+        XCTAssertNotEqual(defaults.string(forKey: "closedLidHelperRegisteredGeneration"), "old-generation")
+    }
+
+    func testReregisterDoesNotRegisterWhenUnregistrationTimesOutOrCompletesLate() {
+        defaults.set("old-generation", forKey: "closedLidHelperRegisteredGeneration")
+        var finishUnregistering: ((Error?) -> Void)?
+        service.unregisterHandler = { finishUnregistering = $0 }
+        client = ClosedLidHelperClient(
+            service: service,
+            defaults: defaults,
+            logStore: LogStore(),
+            reregistrationStatusProvider: { $0(.inactive) },
+            reregistrationWaitTimeout: 0.01
+        )
+
+        let result = prepareForUse()
+
+        guard case .failure(let message) = result else {
+            XCTFail("Expected failure, got \(result)")
+            return
+        }
+        XCTAssertTrue(message.contains("unregistration timed out"))
+        XCTAssertEqual(service.unregisterCallCount, 1)
+        XCTAssertEqual(service.registerCallCount, 0)
+        XCTAssertEqual(defaults.string(forKey: "closedLidHelperRegisteredGeneration"), "old-generation")
+
+        finishUnregistering?(nil)
+        XCTAssertEqual(service.registerCallCount, 0)
+        XCTAssertEqual(defaults.string(forKey: "closedLidHelperRegisteredGeneration"), "old-generation")
+
+        // A subsequent attempt can recover without mistaking the old generation
+        // for a successfully registered new helper.
+        XCTAssertEqual(prepareForUse(), .ready)
+        XCTAssertEqual(service.unregisterCallCount, 1)
+        XCTAssertEqual(service.registerCallCount, 1)
+        XCTAssertNotEqual(defaults.string(forKey: "closedLidHelperRegisteredGeneration"), "old-generation")
+    }
+
     func testReregisterStopsActiveOldHelperBeforeUnregistering() {
         defaults.set("old-generation", forKey: "closedLidHelperRegisteredGeneration")
         reregistrationStatusResults = [.active(.indefinite(token: "old-token"))]
@@ -677,6 +739,7 @@ private final class FakeClosedLidService: ClosedLidServiceManaging {
     var statusAfterRegister: SMAppService.Status = .enabled
     var registerError: Error?
     var unregisterError: Error?
+    var unregisterHandler: ((@escaping (Error?) -> Void) -> Void)?
     var eventRecorder: ((String) -> Void)?
 
     private(set) var registerCallCount = 0
@@ -695,13 +758,20 @@ private final class FakeClosedLidService: ClosedLidServiceManaging {
         status = statusAfterRegister
     }
 
-    func unregister() throws {
+    func unregister(completionHandler: @escaping @Sendable (Error?) -> Void) {
         unregisterCallCount += 1
         eventRecorder?("unregister")
-        if let unregisterError {
-            throw unregisterError
+        let finish: (Error?) -> Void = { [self] error in
+            if error == nil {
+                status = .notRegistered
+            }
+            completionHandler(error)
         }
-        status = .notRegistered
+        if let unregisterHandler {
+            unregisterHandler(finish)
+        } else {
+            finish(unregisterError)
+        }
     }
 }
 

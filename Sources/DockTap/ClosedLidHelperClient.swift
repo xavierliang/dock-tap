@@ -2,6 +2,7 @@ import DockTapClosedLidIPC
 import CryptoKit
 import Foundation
 import ServiceManagement
+import os
 
 enum ClosedLidHelperSessionMode: Equatable {
     case timed
@@ -55,7 +56,7 @@ enum ClosedLidHelperStatusResult: Equatable {
 protocol ClosedLidServiceManaging: AnyObject {
     var status: SMAppService.Status { get }
     func register() throws
-    func unregister() throws
+    func unregister(completionHandler: @escaping @Sendable (Error?) -> Void)
 }
 
 extension SMAppService: ClosedLidServiceManaging {}
@@ -411,9 +412,12 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
             return RegistrationPreparationOutcome(result, activeSession: activeSession)
         }
 
-        do {
-            try service.unregister()
-        } catch {
+        guard let unregisterResult = waitForOldHelperUnregistration() else {
+            return RegistrationPreparationOutcome(
+                .failure("helper re-registration failed: old helper unregistration timed out")
+            )
+        }
+        if case .failure(let error) = unregisterResult {
             return RegistrationPreparationOutcome(
                 .failure("helper re-registration failed while unregistering old helper: \(error.localizedDescription)")
             )
@@ -431,6 +435,30 @@ final class ClosedLidHelperClient: ClosedLidHelperClienting {
                 registrationFailureResult(error, shouldAcceptAlreadyRegistered: false)
             )
         }
+    }
+
+    private func waitForOldHelperUnregistration() -> Result<Void, Error>? {
+        let semaphore = DispatchSemaphore(value: 0)
+        let result = OSAllocatedUnfairLock<Result<Void, Error>?>(initialState: nil)
+
+        // The synchronous API returns before the old service is reaped. Apple
+        // guarantees re-registration is safe only after this callback completes.
+        // Wait on registrationQueue, leaving the main thread free to update UI.
+        service.unregister { error in
+            result.withLock {
+                if let error {
+                    $0 = .failure(error)
+                } else {
+                    $0 = .success(())
+                }
+            }
+            semaphore.signal()
+        }
+
+        guard semaphore.wait(timeout: reregistrationTimeout) == .success else {
+            return nil
+        }
+        return result.withLock { $0 }
     }
 
     private func proveOldHelperInactiveOrRestored() -> ReregistrationReadiness {
